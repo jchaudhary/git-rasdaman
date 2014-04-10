@@ -1,0 +1,2 @@
+petascope.wms.LayerDefinition
+petascope.wms.LayerContainer
