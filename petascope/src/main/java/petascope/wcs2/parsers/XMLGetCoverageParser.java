@@ -83,15 +83,7 @@ public class XMLGetCoverageParser extends XMLParser<GetCoverageRequest> {
 
     @Override
     public GetCoverageRequest parse(HTTPRequest request) throws WCSException {
-        System.out.println("***************************************");
-        System.out.println("***************************************");
-        System.out.println("***************************************");
-        System.out.println("***************************************");
-        System.out.println(request);
-        System.out.println("***************************************");
-        System.out.println("***************************************");
-        System.out.println("***************************************");
-        System.out.println("***************************************");
+      
         // input XML validation
         if(ConfigManager.XML_VALIDATION.equals(XML_VALIDATION_T)){
             validateInput(request.getRequestString(), schema);

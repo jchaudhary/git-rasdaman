@@ -51,6 +51,10 @@ public class InsertCoverageRequest extends BaseRequest {
         this.useId = (useId == NEW) ? NEW : EXISTING;
     }
     
+    public String getCoverageRef() {
+        return this.coverageRef;
+    }
+    
       @Override
     public String toString() {
         return VALUE_INSERTCOVERAGE + ": " + this.coverageRef;

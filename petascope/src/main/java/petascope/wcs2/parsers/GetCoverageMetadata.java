@@ -84,7 +84,9 @@ public class GetCoverageMetadata {
         domLow = domHigh = "";
         gisDomLow = gisDomHigh = "";
         gridType = gridId = "";
-
+        
+        System.out.println(meta);
+        
         if (!meta.existsCoverageName(coverageId)) {
             throw new WCSException(ExceptionCode.NoSuchCoverage.locator(coverageId),
                     "One of the identifiers passed does not match with any of the coverages offered by this server");

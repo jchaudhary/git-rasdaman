@@ -92,7 +92,7 @@ public abstract class KVPParser<T extends Request> extends AbstractRequestParser
                 continue;
             }
             
-            if (k.equals(KEY_REQUEST) && getOperationName().equals(RequestHandler.INSERT_COVERAGE)) {
+            if ((k.equals(KEY_REQUEST) && getOperationName().equals(RequestHandler.INSERT_COVERAGE)) || (k.equals(KEY_REQUEST) && getOperationName().equals(RequestHandler.INSERT_COVERAGE) && k.equals(KEY_USEID)) ) {
                 continue;
             }
             

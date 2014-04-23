@@ -23,19 +23,31 @@
 package petascope.wcs2.handlers;
 
 import java.io.IOException;
+import java.math.BigInteger;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.logging.Level;
+import nu.xom.Builder;
 import nu.xom.Document;
+import nu.xom.Element;
+import nu.xom.ParsingException;
 import petascope.wcs2.parsers.InsertCoverageRequest;
 import petascope.wcs2.handlers.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import petascope.core.DbMetadataSource;
 import petascope.exceptions.ExceptionCode;
+import petascope.exceptions.PetascopeException;
 import petascope.exceptions.WCSException;
+import petascope.util.Pair;
 import static petascope.util.XMLSymbols.LABEL_COVERAGE_DESCRIPTIONS;
 import static petascope.util.XMLSymbols.NAMESPACE_WCS;
 import static petascope.util.XMLUtil.serialize;
 import petascope.wcs2.extensions.FormatExtension;
+import petascope.util.XMLUtil;
+import static petascope.util.XMLUtil.CollectNamespaceAndPrefix;
+import static petascope.util.XMLUtil.returnNamespaceUrl;
 
 /**
  *
@@ -50,8 +62,37 @@ public class InsertCoverageHandler extends AbstractRequestHandler<InsertCoverage
     }
     
     @Override
-    public Response handle(InsertCoverageRequest request) throws WCSException {
+    public Response handle(InsertCoverageRequest request) throws WCSException, PetascopeException {
         Document ret = constructDocument(LABEL_COVERAGE_DESCRIPTIONS, NAMESPACE_WCS);
+        Element root = null;
+        //String url = request.getCoverageRef();
+        String url = "http://localhost:8080/rasdaman/?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=mr";
+        Document coverage = null;
+        Builder parser = new Builder();
+        Set<Pair<String, String>> namespaceSet = new HashSet<Pair<String, String>>();
+        try {
+            coverage = parser.build(url);
+            root = coverage.getRootElement();
+            namespaceSet = CollectNamespaceAndPrefix(coverage, root);
+        } catch (ParsingException ex) {
+            java.util.logging.Logger.getLogger(InsertCoverageHandler.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            java.util.logging.Logger.getLogger(InsertCoverageHandler.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        
+        String namespaceUrl = returnNamespaceUrl("gml", namespaceSet);
+        String coverageName = root.getAttributeValue("id", namespaceUrl);
+        log.debug("Coverage name = " + coverageName);
+        int coverageId = meta.getCoverageId(coverageName);
+        String coverageType = root.getLocalName();
+        log.debug("Coverage Type = " + coverageType);
+        
+        
+        
+        
+        //BigInteger oid;
+        //oid = meta.getCollOid("rgb");
+        
         try {
             /*the response goes here.*/
             return new Response(null, serialize(ret), FormatExtension.MIME_XML);

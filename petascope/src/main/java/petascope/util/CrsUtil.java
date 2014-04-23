@@ -150,13 +150,14 @@ public class CrsUtil {
     public static CrsDefinition getGmlDefinition(String givenCrsUri) throws PetascopeException, SecoreException {
         CrsDefinition crs = null;
         List<List<String>> axes = new ArrayList<List<String>>();
-
+        System.out.println(givenCrsUri);
         // Remove any possible slicing suffixes:
         givenCrsUri = givenCrsUri.replaceAll(SLICED_AXIS_SEPARATOR + ".*$", "");
 
         // Check first if the definition is already in cache:
         if (CrsUri.isCached(givenCrsUri)) {
             log.info(givenCrsUri + " definition is already in cache: do not need to fetch GML definition.");
+            System.out.println(CrsUri.getCachedDefinition(givenCrsUri));
             return CrsUri.getCachedDefinition(givenCrsUri);
         }
 

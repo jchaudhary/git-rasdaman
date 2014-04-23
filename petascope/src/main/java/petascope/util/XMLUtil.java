@@ -55,6 +55,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.logging.Level;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -80,9 +81,11 @@ import org.xml.sax.XMLReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.ErrorHandler;
+import petascope.core.CoverageMetadata;
 import petascope.util.traverse.DFSTraversor;
 import petascope.util.traverse.Filter;
 import petascope.util.traverse.TraversableXOM;
+import petascope.wcs2.handlers.InsertCoverageHandler;
 
 /**
  * Common utility methods for working with XML.
@@ -229,7 +232,7 @@ public class XMLUtil {
      */
     public static Document buildDocument(String baseURI, InputStream in) throws IOException, ParsingException {
         Document doc = null;
-
+        CoverageMetadata covMeta;
         try {
             doc = builder.get().build(in, baseURI);
         } catch (ParsingException ex) {
@@ -634,7 +637,7 @@ public class XMLUtil {
      *
      * @return a list of the collected elements
      */
-    public static List<Element> collectAll(Element e, String prefix, String name, XPathContext ctx) {
+     public static List<Element> collectAll(Element e, String prefix, String name, XPathContext ctx) {
         List<Element> ret = new ArrayList<Element>();
         Nodes notations = null;
         if (ctx != null) {
@@ -1163,4 +1166,41 @@ public class XMLUtil {
         Element fragmentNode = docBuilder.build(new StringReader(fragment)).getRootElement();
         return (Element)fragmentNode.copy();
     }
+    
+    /**
+     * Given a url, it collects the namespace and prefix used in the document
+     * @param doc
+     * @param e
+     * @return
+     */
+    public static Set<Pair<String, String>> CollectNamespaceAndPrefix(Document doc, Element e) throws ParsingException, IOException{
+        Set<Pair<String, String>> namespaceSet = new HashSet<Pair<String, String>>();
+        Pair<String, String> namespacePrefixAndUrl = Pair.of("", "");
+        e = doc.getRootElement();
+        for(int i = 0; i < e.getNamespaceDeclarationCount() ; i++) {
+            String prefix = e.getNamespacePrefix(i);
+            String nsUrl =  e.getNamespaceURI(e.getNamespacePrefix(i));
+            namespacePrefixAndUrl = Pair.of(prefix, nsUrl);
+            namespaceSet.add(namespacePrefixAndUrl);
+        }
+        return namespaceSet;
+    }
+    
+    /**
+     * Returns the namespace url given the namespace prefix
+     * @param prefix    namespace prefix
+     * @param pairs     Set of pair of prefixes and their respective urls
+     * @return 
+     */
+    public static String returnNamespaceUrl(String prefix, Set<Pair<String, String>> pairs) {
+        String url = null;
+        for (Pair<String, String> pair : pairs) {
+            if (pair.fst.equalsIgnoreCase(prefix)) {
+                url = pair.snd;
+            } 
+        }
+        log.debug("namespace url for the given prefix is " + url);
+        return url;
+    }
 }
+

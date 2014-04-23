@@ -58,6 +58,7 @@ import petascope.exceptions.SecoreException;
 import petascope.exceptions.WCSException;
 import petascope.ows.Description;
 import petascope.ows.ServiceProvider;
+import petascope.swe.datamodel.AbstractSimpleComponent;
 import petascope.swe.datamodel.AllowedValues;
 import petascope.swe.datamodel.NilValue;
 import petascope.swe.datamodel.Quantity;
@@ -1300,14 +1301,46 @@ public class DbMetadataSource implements IMetadataSource {
      * @throws PetascopeException
      */
     // TODO (WCS-T)
-    /*private void write(CoverageMetadata meta, boolean commit) throws PetascopeException {
+    private void write(CoverageMetadata meta, boolean commit) throws PetascopeException {
         String coverageName = meta.getCoverageName();
         if (existsCoverageName(coverageName)) {
             updateCoverageMetadata(meta, commit);
         } else {
             insertNewCoverageMetadata(meta, commit);
+        }        
+    }
+    
+    public void insertNewCoverageMetadata(CoverageMetadata meta, boolean commit) {
+        int coverageId = meta.getCoverageId();    // Used when reading metadata from the DB
+        List<CellDomainElement> cellDomain = meta.getCellDomainList();
+        List<DomainElement> domain = meta.getDomainList();
+        String coverageName = meta.getCoverageName();
+        String coverageType = meta.getCoverageType();
+        String nativeFormat = meta.getNativeFormat();
+        List<String> crsUris = meta.getCrsUris(); // 1+ single CRS URIs
+        Set<Pair<String,String>> extraMetadata = meta.getExtraMetadata(); // {metadata_type,metadata_value}
+        
+        List<RangeElement> range = null;
+        Iterator<RangeElement> itRangeElement = meta.getRangeIterator();
+        while (itRangeElement.hasNext()) {
+            range.add(itRangeElement.next());
         }
-    }*/
+        
+        Iterator<AbstractSimpleComponent> itAbstract = meta.getSweComponentsIterator();
+        List<AbstractSimpleComponent> sweComponents = null;
+        while(itAbstract.hasNext()) {
+            sweComponents.add(itAbstract.next());
+        }
+        
+        Pair<BigInteger, String> rasdamanCollection =  meta.getRasdamanCollection();
+        Bbox bbox = meta.getBbox();
+    }
+    
+    //TOO
+    public void updateCoverageMetadata(CoverageMetadata meta, boolean commit) {
+        
+    }
+    
     public void delete(CoverageMetadata meta, boolean commit) throws PetascopeException {
         String coverageName = meta.getCoverageName();
         if (existsCoverageName(coverageName) == false) {
@@ -1905,7 +1938,7 @@ public class DbMetadataSource implements IMetadataSource {
             throw new PetascopeException(ExceptionCode.InvalidRequest,
                     "Metadata database error", sqle);
         }
-    }
+    }    
 
     /**
      * Get the lower and upper bound of the specified coverage's dimension in pixel coordinates.
@@ -1950,9 +1983,90 @@ public class DbMetadataSource implements IMetadataSource {
             log.error("Empty response from rasdaman.");
             throw new PetascopeException(ExceptionCode.RasdamanError, "Empty response from rasdaman.");
         }
+        System.out.println(bounds);
         return bounds;
     }
-
+    
+    /**
+     * Get Oid of a specified coverage from rasdaman
+     * @param collName      The name of the collection
+     * @return              The Oid of the collection
+     * @throws PetascopeException 
+     */
+    public BigInteger getCollOid(String collName) throws PetascopeException {
+        Object obj = null;
+        String rasQuery =
+            RASQL_SELECT + " " + RASQL_OID + "(c)" +
+            RASQL_FROM   + " " + collName + " " + RASQL_AS + " c " 
+            ;
+        
+        log.debug("RasQL Query : " + rasQuery);
+        try {
+            obj = RasUtil.executeRasqlQuery(rasQuery);
+        } catch (RasdamanException ex) {
+            throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+        }
+        BigInteger oid = null;
+        String result;
+        if (obj != null) {
+            RasQueryResult res = new RasQueryResult(obj);
+            if (!res.getScalars().isEmpty()) {
+                result = res.getScalars().get(0);
+            } else {
+                log.error("Oid of collection " + collName + " was not found.");
+                throw new PetascopeException(ExceptionCode.InvalidCoverageConfiguration,
+                    "Oid of collection " + collName + " was not found: does not exist in " + TABLE_RASDAMAN_COLLECTION);
+            }
+        } else {
+            log.error("Empty response from rasdaman.");
+            throw new PetascopeException(ExceptionCode.RasdamanError, "Empty response from rasdaman.");
+        }
+        String oidstr = (result.replaceFirst(".*?(\\d+).*", "$1"));
+        oid = BigInteger.valueOf(Integer.parseInt(oidstr));
+        log.debug("Oid = " + oid);
+        return oid;
+    }
+    
+    /**
+     * Returns the coverage id of the specified coverage from ps_coverage
+     * @param name          name of the coverage
+     * @return              id of the coverage
+     * @throws PetascopeException 
+     */
+    public int getCoverageId(String name) throws PetascopeException {
+        int id = 0;
+        Statement s = null;
+        try {
+            ensureConnection();
+            s= conn.createStatement();
+            String sqlQuery = 
+                "SELECT " + COVERAGE_ID +
+                " FROM " + TABLE_COVERAGE + 
+                " WHERE " + COVERAGE_NAME + " = " + "\'"+name + "\'"
+                ;
+            log.debug("SQLQuery : " + sqlQuery);
+            ResultSet r = s.executeQuery(sqlQuery);
+            
+            while (r.next()) {
+                id = r.getInt("id");    
+            }
+            log.debug("id = " + id);
+        } catch (SQLException sqle) {
+            /* Abort this transaction */
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+            throw new PetascopeException(ExceptionCode.InvalidRequest,
+                    "Metadata database error", sqle);
+            }               
+        return id;
+    }
+    
     public ResultSet executePostGISQuery(String postGisQuery) throws PetascopeException{
         Statement s = null;
         ResultSet r = null;

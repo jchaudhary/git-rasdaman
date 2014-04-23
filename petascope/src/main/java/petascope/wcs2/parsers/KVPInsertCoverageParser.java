@@ -41,7 +41,7 @@ public class KVPInsertCoverageParser extends KVPParser<InsertCoverageRequest> {
     public InsertCoverageRequest parse(HTTPRequest request) throws WCSException {
         String input = request.getRequestString();
         Map<String, List<String>> p = StringUtil.parseQuery(input);
-        checkEncodingSyntax(p, KEY_COVERAGEREF, KEY_VERSION);
+        checkEncodingSyntax(p, KEY_COVERAGEREF, KEY_VERSION, KEY_USEID);
         String coverageref = p.get(KEY_COVERAGEREF).toString();
         if (coverageref == null) {
             throw new WCSException(ExceptionCode.InvalidRequest, "A InsertCoverage request must specify a "+ KEY_COVERAGEREF + ".");
