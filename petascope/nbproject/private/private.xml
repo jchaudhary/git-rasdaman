@@ -3,7 +3,13 @@
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
         <group>
-            <file>file:/home/rasdaman/install/rasdaman/applications/petascope/src/main/java/petascope/util/XMLUtil.java</file>
+            <file>file:/home/rasdaman/install/rasdaman/applications/petascope/src/main/java/petascope/core/DbMetadataSource.java</file>
+            <file>file:/home/rasdaman/install/rasdaman/applications/petascope/src/main/java/petascope/wcsTransaction/handlers/InsertCoverageHandler.java</file>
+            <file>file:/home/rasdaman/install/rasdaman/applications/petascope/src/main/java/petascope/core/CoverageMetadata.java</file>
+            <file>file:/home/rasdaman/install/rasdaman/applications/petascope/src/main/java/petascope/util/StringUtil.java</file>
+            <file>file:/home/rasdaman/install/rasdaman/applications/petascope/src/main/java/petascope/util/TypeConstants.java</file>
+            <file>file:/home/rasdaman/install/rasdaman/applications/petascope/src/main/java/petascope/PetascopeInterface.java</file>
+            <file>file:/home/rasdaman/install/rasdaman/applications/petascope/src/main/java/petascope/util/ListUtil.java</file>
         </group>
     </open-files>
 </project-private>

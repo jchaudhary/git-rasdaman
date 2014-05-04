@@ -118,7 +118,34 @@ public class ListUtil {
         }
         return s;
     }
-
+   /**
+     * Converts a collection  to a string with delimit ","
+     *
+     * @param l the element list
+     * @return A String of the ListElements separated by new lines
+     */
+    public static <T> String ltosWithComma(Collection<T> l) {
+        String s = "";
+        for (Iterator<T> iter = l.iterator(); iter.hasNext();) {
+            Object o = iter.next();
+            String tmp = null;
+            if (o instanceof Node) {
+                tmp = ((Node) o).toXML();
+            } else if (o instanceof Collection) {
+                tmp = ltos((Collection) o);
+            } else {
+                tmp = o.toString();
+            }
+            if (!s.equals("")) {
+                s += ",";
+                s += tmp;
+            } else {
+                s += tmp;
+            }
+        }
+        return s;
+    }
+    
     /**
      * Converts a string to a list
      *
@@ -255,8 +282,7 @@ public class ListUtil {
         // "el" was outside bounds
         return a.size()-1;
     }
-
-
+           
     /**
      * Returns the relative orders of the element in a numeric list.
      * @param <T>
@@ -329,5 +355,12 @@ public class ListUtil {
 
             return out;
         }
+    }
+    
+    public static List<String> returnMarray(String data, int size) {
+        List<String> marray = new ArrayList<String>();
+        
+        
+        return marray;
     }
 }

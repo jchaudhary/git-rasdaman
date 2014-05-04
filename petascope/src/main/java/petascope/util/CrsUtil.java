@@ -1741,4 +1741,21 @@ public class CrsUtil {
             return ret;
         }
     }
+    
+    public static List<String> getCrsUris(String compoundUri) {
+            List<String> crsUris = new ArrayList<String>();
+            int len = compoundUri.split("http").length;
+            for (int i = 2; i< len; i++) {
+              String temp;
+              if ( i == len -1) {
+                  temp = "http"+(compoundUri.split("http")[i]);
+                  crsUris.add(temp);
+              } else {
+                  temp = "http"+(compoundUri.split("http")[i]);
+                  String buff = temp.substring(0, temp.length()-3);
+                  crsUris.add(buff);
+              }
+          }
+          return crsUris;              
+        }
 }

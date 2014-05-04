@@ -21,6 +21,8 @@
  */
 package petascope.wcs2.parsers;
 
+import petascope.wcsTtransaction.parsers.KVPDeleteCoverageParser;
+import petascope.wcsTtransaction.parsers.KVPInsertCoverageParser;
 import java.util.HashSet;
 import java.util.Set;
 

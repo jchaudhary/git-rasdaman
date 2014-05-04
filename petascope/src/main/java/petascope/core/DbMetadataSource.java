@@ -41,9 +41,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import petascope.ConfigManager;
+import petascope.util.TypeConstants;
 import static petascope.ConfigManager.ENABLE_OWS_METADATA;
 import static petascope.ConfigManager.ENABLE_OWS_METADATA_F;
 import static petascope.ConfigManager.KEY_ENABLE_OWS_METADATA;
@@ -66,6 +68,7 @@ import petascope.swe.datamodel.RealPair;
 import petascope.util.CrsUtil;
 import petascope.util.ListUtil;
 import petascope.util.Pair;
+import static petascope.util.TypeConstants.getTypeConstants;
 import petascope.util.Vectors;
 import petascope.util.WcsUtil;
 import static petascope.util.ras.RasConstants.*;
@@ -1341,6 +1344,48 @@ public class DbMetadataSource implements IMetadataSource {
         
     }
     
+    public void createCollection(String collName, String collType) throws PetascopeException {
+        Object obj = null;
+        String user = "rasadmin";
+        String pass = "rasadmin";
+        boolean writeFlag = true;
+        String rasQuery =
+                RASQL_UPDATE + " " + RASQL_COLLECTION + " " + collName + " " + collType + " --user rasadmin --passwd rasadmin"
+                ;
+        log.debug("RasQL Query : " + rasQuery);
+        try {
+            obj = RasUtil.executeRasqlQuery(rasQuery, user, pass, writeFlag);
+        } catch (RasdamanException ex) {
+            throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+        }
+    }
+    
+    public void initialize2DCollection(List<Pair<BigInteger, BigInteger>> coordinate, String collName, String type) throws PetascopeException {
+        Object obj = null;
+        HashMap<String, String> typeConstants = getTypeConstants();
+        String user = "rasadmin";
+        String pass = "rasadmin";
+        boolean writeFlag = true;
+        String rasQuery =
+                RASQL_INSERT + " into " + collName + " " +
+                RASQL_VALUES + " " + RASQL_MARRAY + " x in " + "[" + coordinate.get(0).fst + ":" + coordinate.get(0).snd + "," + coordinate.get(1).fst + ":" + coordinate.get(1).snd + "]" +
+                RASQL_VALUES + "0" + typeConstants.get(type)
+                ;
+        log.debug("RasQl Query : " + rasQuery);
+        try {
+            obj = RasUtil.executeRasqlQuery(rasQuery, user, pass, true);
+        } catch (RasdamanException ex) {
+            throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+        }
+    }
+    
+    
+    public <T> void insert2DCoverage(List<Pair<BigInteger, BigInteger>> coordinate, String type, List<T> data ) {
+        Object obj = null;
+        String user = "rasadmin"; 
+        String pass = "rasadmin";
+    }
+    
     public void delete(CoverageMetadata meta, boolean commit) throws PetascopeException {
         String coverageName = meta.getCoverageName();
         if (existsCoverageName(coverageName) == false) {
@@ -1382,6 +1427,7 @@ public class DbMetadataSource implements IMetadataSource {
      * @param commit
      * @throws PetascopeException 
      */
+    
     public void delete(List<String> coverageIds, boolean commit) throws PetascopeException {
         for (String coverageName: coverageIds) {
             if (existsCoverageName(coverageName) == false) {
@@ -1415,6 +1461,29 @@ public class DbMetadataSource implements IMetadataSource {
         } 
     }
 
+    public int getGmlSubtypeId(String gmlSubType) throws PetascopeException {
+        int gmlSubTypeId = 0;
+        try {
+            Statement s = null;
+            s = conn.createStatement();
+            String sqlQuery =
+                    "SELECT id FROM " + TABLE_GML_SUBTYPE +
+                    " WHERE " + GML_SUBTYPE_SUBTYPE + " = " + "'" + gmlSubType + "'"
+                    ;
+            log.debug("SQL Query : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+            while (r.next()) {
+                gmlSubTypeId = r.getInt("id");
+            }
+            log.trace("gml_subtype_id for " + gmlSubType + " : " + gmlSubTypeId);
+            s.close();
+        } catch (SQLException ex) {
+            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return gmlSubTypeId;
+    }
+    
     /**
      * Check if there is metadata available for a given coverage name
      * @param name coverage name

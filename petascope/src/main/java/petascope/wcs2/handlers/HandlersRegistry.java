@@ -21,6 +21,10 @@
  */
 package petascope.wcs2.handlers;
 
+import petascope.wcsTransaction.handlers.DeleteCoverageHandler;
+import petascope.wcsTransaction.handlers.InsertCoverageHandler;
+import petascope.wcsTtransaction.parsers.DeleteCoverageRequest;
+import petascope.wcsTtransaction.parsers.InsertCoverageRequest;
 import petascope.wcs2.parsers.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -22,6 +22,7 @@
 
 package petascope.util.ras;
 
+import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.antlr.runtime.ANTLRStringStream;
@@ -37,6 +38,8 @@ import org.odmg.Transaction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import petascope.ConfigManager;
+import static petascope.ConfigManager.RASDAMAN_ADMIN_PASS;
+import static petascope.ConfigManager.RASDAMAN_ADMIN_USER;
 import petascope.exceptions.ExceptionCode;
 import petascope.exceptions.RasdamanException;
 import petascope.exceptions.WCPSException;
@@ -198,6 +201,133 @@ public class RasUtil {
             }
         }
         return ret;
+    }
+
+    /**
+     * Execute a RasQL query with specified credentials and write flag 
+     * @param query
+     * @param username
+     * @param password
+     * @param writeFlag
+     * @return
+     * @throws RasdamanException 
+     */
+    public static Object executeRasqlQuery(String query, String username, String password, boolean writeFlag) throws RasdamanException {
+        RasImplementation impl = new RasImplementation(ConfigManager.RASDAMAN_URL);
+        impl.setUserIdentification(username, password);
+        Database db = impl.newDatabase();
+        if (writeFlag && (username.compareTo(RASDAMAN_ADMIN_USER) == 0) && (password.compareTo(RASDAMAN_ADMIN_PASS) == 0)) {
+            int maxAttempts, timeout, attempts = 0;
+
+            //The result of the query will be assigned to ret
+            //Should allways return a result (empty result possible)
+            //since a RasdamanException will be thrown in case of error
+            Object ret=null;
+
+            try {
+                timeout = Integer.parseInt(ConfigManager.RASDAMAN_RETRY_TIMEOUT) * 1000;
+            } catch(NumberFormatException ex) {
+                timeout = DEFAULT_TIMEOUT * 1000;
+                log.info("The setting " + ConfigManager.RASDAMAN_RETRY_TIMEOUT + " is not defined. Assuming " + DEFAULT_TIMEOUT + " seconds between re-connect attemtps to a rasdaman server.");
+                }
+
+                try {
+                    maxAttempts = Integer.parseInt(ConfigManager.RASDAMAN_RETRY_ATTEMPTS);
+                } catch(NumberFormatException ex) {
+                    maxAttempts = DEFAULT_RECONNECT_ATTEMPTS;
+                    log.info("The setting " + ConfigManager.RASDAMAN_RETRY_ATTEMPTS + " is not defined. Assuming " + DEFAULT_RECONNECT_ATTEMPTS + " attempts to connect to a rasdaman server.");
+                }
+
+                Transaction tr;
+
+                //Try to connect until the maximum number of attempts is reached
+                //This loop handles connection attempts to a saturated rasdaman
+                //complex which will refuse the connection until a server becomes
+                //available.
+                boolean queryCompleted = false, dbOpened = false;
+                while(!queryCompleted) {
+
+                    //Try to obtain a free rasdaman server
+                    try {
+                        db.open(ConfigManager.RASDAMAN_DATABASE, Database.OPEN_READ_WRITE);
+                        dbOpened = true;
+                        tr = impl.newTransaction();
+                        tr.begin();
+                        OQLQuery q = impl.newOQLQuery();
+
+                        //A free rasdaman server was obtain, executing query
+                        try {
+                            q.create(query);
+                            log.trace("Executing query {}", query);
+                            ret = q.execute();
+                            tr.commit();
+                            queryCompleted = true;
+                        } catch (QueryException ex) {
+
+                            //Executing a rasdaman query failed
+                            tr.abort();
+                            throw new RasdamanException(ExceptionCode.RasdamanRequestFailed,
+                                    "Error evaluating rasdaman query: '" + query, ex);
+                        } catch (Error ex) {
+                            tr.abort();
+                            throw new RasdamanException(ExceptionCode.RasdamanRequestFailed,
+                                    "Requested more data than the server can handle at once.");
+                        } finally {
+
+                            //Done connection with rasdaman, closing database.
+                            try {
+                                db.close();
+                            } catch (ODMGException ex) {
+                                log.info("Error closing database connection: ", ex);
+                            }
+                        }
+                    } catch(RasConnectionFailedException ex) {
+
+                        //A connection with a Rasdaman server could not be established
+                        //retry shortly unless connection attpempts exceded the maximum
+                        //possible connection attempts.
+                        attempts++;
+                        if(dbOpened)
+                            try {
+                                db.close();
+                            } catch(ODMGException e) {
+                                log.info("Error closing database connection: ", e);
+                            }
+                        dbOpened = false;
+                        if(!(attempts < maxAttempts))
+                            //Throw a RasConnectionFailedException if the connection
+                            //attempts exceeds the maximum connection attempts.
+                            throw ex;
+
+                        //Sleep before trying to open another connection
+                        try {
+                            Thread.sleep(timeout);
+                        } catch(InterruptedException e) {
+                            log.error("Thread " + Thread.currentThread().getName() +
+                                    " was interrupted while searching a free server.");
+                            throw new RasdamanException(ExceptionCode.RasdamanUnavailable,
+                                    "Unable to get a free rasdaman server.");
+                        }
+                    } catch(ODMGException ex) {
+
+                        //The maximum ammount of connection attempts was exceded
+                        //and a connection could not be established. Return
+                        //an exception indicating Rasdaman is unavailable.
+
+                        log.info("A Rasdaman request could not be fullfilled since no "+
+                                "free Rasdaman server were available. Consider adjusting "+
+                                "the values of rasdaman_retry_attempts and rasdaman_retry_timeout "+
+                                "or adding more Rasdaman servers.",ex);
+
+                        throw new RasdamanException(ExceptionCode.RasdamanUnavailable,
+                                "Unable to get a free rasdaman server.");
+                    }
+                }
+                return ret; 
+        } else {
+            log.debug("You do not have the permission to write");
+            return null;
+        }
     }
 
     /**

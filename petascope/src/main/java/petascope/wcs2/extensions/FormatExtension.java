@@ -27,7 +27,7 @@ import petascope.exceptions.SecoreException;
 import petascope.exceptions.WCSException;
 import petascope.wcs2.parsers.GetCoverageRequest;
 import petascope.wcs2.handlers.Response;
-import petascope.wcs2.parsers.DeleteCoverageRequest;
+import petascope.wcsTtransaction.parsers.DeleteCoverageRequest;
 
 /**
  * Applies specific formatting to the result.

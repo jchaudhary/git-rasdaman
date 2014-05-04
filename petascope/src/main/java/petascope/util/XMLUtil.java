@@ -38,6 +38,7 @@
 package petascope.util;
 
 import com.eaio.uuid.UUID;
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -45,6 +46,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.StringReader;
 import java.util.ArrayList;
@@ -66,6 +68,7 @@ import nu.xom.Builder;
 import nu.xom.Comment;
 import nu.xom.Document;
 import nu.xom.Element;
+import nu.xom.Elements;
 import nu.xom.Node;
 import nu.xom.Nodes;
 import nu.xom.ParentNode;
@@ -85,7 +88,7 @@ import petascope.core.CoverageMetadata;
 import petascope.util.traverse.DFSTraversor;
 import petascope.util.traverse.Filter;
 import petascope.util.traverse.TraversableXOM;
-import petascope.wcs2.handlers.InsertCoverageHandler;
+import petascope.wcsTransaction.handlers.InsertCoverageHandler;
 
 /**
  * Common utility methods for working with XML.
@@ -1202,5 +1205,92 @@ public class XMLUtil {
         log.debug("namespace url for the given prefix is " + url);
         return url;
     }
+    
+    private static List<String> childrenList = new ArrayList(); 
+    /**
+     * returns the list of children elements of the root
+     * @param current
+     * @param depth
+     * @return 
+     */
+    public static List<String> listChildren(Element current, int depth) {
+        //System.out.println(current.getQualifiedName());
+        Elements children = current.getChildElements();
+        for (int i = 0; i < children.size(); i++) {
+            childrenList.add(children.get(i).getQualifiedName());
+            listChildren(children.get(i), depth+1);
+        }
+        return childrenList;
+    }
+    
+    private static String attValue = "";
+    /**
+     * return the attribute value of the given element's given attribute
+     * @param current
+     * @param elem
+     * @param att
+     * @return 
+     */
+    public static String returnAttributeValue(Element current, String elementName, String attributeName) {
+        Elements children = current.getChildElements();
+        for (int i = 0; i < children.size(); i++) {
+            if (children.get(i).getLocalName().equalsIgnoreCase(elementName)) {
+                attValue = children.get(i).getAttributeValue(attributeName);
+                break;
+            } else {
+                returnAttributeValue(children.get(i), elementName, attributeName);
+            }
+        }
+        return attValue;
+    }
+    
+    private static String attValue2 = "";
+    public static String returnAttributeValue(Element current, String attributeName) {
+        Elements children = current.getChildElements();
+        for (int i = 0; i < children.size(); i++) {
+            int attCount = children.get(i).getAttributeCount();
+            for (int j =0; j< attCount; j++) {
+                if (children.get(i).getAttribute(j).getLocalName().equalsIgnoreCase(attributeName)) {
+                    attValue2 = children.get(i).getAttribute(j).getValue();
+                    break;
+                } else {
+                returnAttributeValue(children.get(i), attributeName);
+                }            
+            } 
+        }
+        return attValue2;
+    }
+    
+    
+    private static String value = "";
+    
+    public static String returnValue(Element current, String elementName) {
+        Elements children = current.getChildElements();
+        for (int i = 0; i < children.size(); i++) {
+            if (children.get(i).getLocalName().equalsIgnoreCase(elementName)) {
+                value = children.get(i).getValue();
+                break;
+            } else {
+                returnValue(children.get(i), elementName);
+            }
+        }
+        return value;
+    }
+    
+    private static BufferedReader rd;
+    public static BufferedReader returnStream(Element current, String elementName) {
+        Elements children = current.getChildElements();
+        for (int i = 0; i < children.size(); i++) {
+            if (children.get(i).getLocalName().equalsIgnoreCase(elementName)) {
+                rd = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(children.get(i).getValue().getBytes())));
+                break;
+            } else {
+                returnStream(children.get(i), elementName);
+            }
+        }
+        return rd;
+    }
 }
+
+
 
