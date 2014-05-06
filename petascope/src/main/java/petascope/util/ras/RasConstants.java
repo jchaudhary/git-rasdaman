@@ -33,6 +33,7 @@ public interface RasConstants {
     public static final String RASQL_ABS               = "abs";
     public static final String RASQL_AND               = "and";
     public static final String RASQL_AS                = "AS";
+    public static final String RASQL_ASSIGN            = "assign";
     public static final String RASQL_BIT               = "bit";
     public static final String RASQL_C                 = "c";
     public static final String RASQL_CASE              = "case";
@@ -54,6 +55,7 @@ public interface RasConstants {
     public static final String RASQL_SCALE             = "scale";
     public static final String RASQL_SDOM              = "sdom";
     public static final String RASQL_SELECT            = "select";
+    public static final String RASQL_SET               = "set";
     public static final String RASQL_SQRT              = "sqrt";
     public static final String RASQL_THEN              = "then";
     public static final String RASQL_UPDATE            = "update";

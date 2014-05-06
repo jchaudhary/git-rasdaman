@@ -21,6 +21,7 @@
  */
 package petascope.core;
 
+import java.io.BufferedReader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Array;
@@ -42,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
+import nu.xom.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import petascope.ConfigManager;
@@ -67,15 +69,24 @@ import petascope.swe.datamodel.Quantity;
 import petascope.swe.datamodel.RealPair;
 import petascope.util.CrsUtil;
 import petascope.util.ListUtil;
+import petascope.wcsTransaction.handlers.InsertCoverageHandler;
+import static petascope.util.ListUtil.returnIndices;
 import petascope.util.Pair;
+import static petascope.util.StringUtil.sdomToStringBuilder;
 import static petascope.util.TypeConstants.getTypeConstants;
 import petascope.util.Vectors;
 import petascope.util.WcsUtil;
+import static petascope.util.XMLUtil.returnAttributeValue;
+import static petascope.util.XMLUtil.returnValue;
 import static petascope.util.ras.RasConstants.*;
 import petascope.util.ras.RasQueryResult;
 import petascope.util.ras.RasUtil;
 import petascope.wcps.server.core.*;
 import petascope.wcs2.parsers.BaseRequest;
+import petascope.util.ListUtil;
+import static petascope.util.ListUtil.sdomBuilder;
+import static petascope.util.StringUtil.bufferedToString;
+import static petascope.util.XMLUtil.returnStream;
 
 /**
  * The DbMetadataSource is a IMetadataSource that uses a relational database. It
@@ -1350,7 +1361,7 @@ public class DbMetadataSource implements IMetadataSource {
         String pass = "rasadmin";
         boolean writeFlag = true;
         String rasQuery =
-                RASQL_UPDATE + " " + RASQL_COLLECTION + " " + collName + " " + collType + " --user rasadmin --passwd rasadmin"
+                RASQL_CREATE + " " + RASQL_COLLECTION + " " + collName + " " + collType + " --user rasadmin --passwd rasadmin"
                 ;
         log.debug("RasQL Query : " + rasQuery);
         try {
@@ -1359,17 +1370,20 @@ public class DbMetadataSource implements IMetadataSource {
             throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
         }
     }
-    
-    public void initialize2DCollection(List<Pair<BigInteger, BigInteger>> coordinate, String collName, String type) throws PetascopeException {
+    /*
+    public void initialize2DCollection(List<Pair<Integer, Integer>> coordinate, String collName, String type) throws PetascopeException {
         Object obj = null;
-        HashMap<String, String> typeConstants = getTypeConstants();
+        TypeConstants typeConstants = new TypeConstants();
+        typeConstants.init();
+        String postfixChar =typeConstants.getTypeConstants().get(type);
+        
         String user = "rasadmin";
         String pass = "rasadmin";
         boolean writeFlag = true;
         String rasQuery =
                 RASQL_INSERT + " into " + collName + " " +
-                RASQL_VALUES + " " + RASQL_MARRAY + " x in " + "[" + coordinate.get(0).fst + ":" + coordinate.get(0).snd + "," + coordinate.get(1).fst + ":" + coordinate.get(1).snd + "]" +
-                RASQL_VALUES + "0" + typeConstants.get(type)
+                RASQL_VALUES + " " + RASQL_MARRAY + " x in " + "[" + coordinate.get(0).fst + ":" + coordinate.get(0).snd + "," + coordinate.get(1).fst + ":" + coordinate.get(1).snd + "] " +
+                RASQL_VALUES + " 0" + postfixChar
                 ;
         log.debug("RasQl Query : " + rasQuery);
         try {
@@ -1378,13 +1392,129 @@ public class DbMetadataSource implements IMetadataSource {
             throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
         }
     }
+    */
+    
+    /**
+     * initializes the given collection with null data given the spatial domain and the base type
+     * @param collName      name of the collection
+     * @param sdom          spatial domain of the collection
+     * @param type          base type
+     * @throws PetascopeException   
+     */
+    public void initializeCollection(String collName, Element domainSet, String baseType) throws PetascopeException {
+        Object obj = null;
+        TypeConstants typeConstants = new TypeConstants();
+        typeConstants.init();
+        String postfixChar =typeConstants.getTypeConstants().get(baseType);
+        String highTemp = returnValue(domainSet, "high");
+        String lowTemp = returnValue(domainSet, "low");
+        String dimension = returnAttributeValue(domainSet, "dimension");
+        String sdom = sdomToStringBuilder(Integer.valueOf(dimension), highTemp, lowTemp);
+        String user = "rasadmin";
+        String pass = "rasadmin";
+        boolean writeFlag = true;
+        String rasQuery =
+                RASQL_INSERT + " into " + collName + " " +
+                RASQL_VALUES + " " + RASQL_MARRAY + " x in " + sdom + " " +
+                RASQL_VALUES + " 0" + postfixChar
+                ;
+        log.debug("RasQl Query : " + rasQuery);
+        try {
+            obj = RasUtil.executeRasqlQuery(rasQuery, user, pass, true);
+        } catch (RasdamanException ex) {
+            throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+        }
+        log.trace("Successful Initialization of :" + collName);
+    }
     
     
-    public <T> void insert2DCoverage(List<Pair<BigInteger, BigInteger>> coordinate, String type, List<T> data ) {
+    public void insertCoverage(String collName, Element domainSet, Element rangeSet, String baseType) throws PetascopeException {
         Object obj = null;
         String user = "rasadmin"; 
         String pass = "rasadmin";
+        boolean writeFlag = true;
+        String highTemp = returnValue(domainSet, "high");
+        String lowTemp = returnValue(domainSet, "low");
+        String dimension = returnAttributeValue(domainSet, "dimension");
+        String sdomString = sdomToStringBuilder(Integer.valueOf(dimension), highTemp, lowTemp);
+        List<Pair<Integer, Integer>> sdom = new ArrayList<Pair<Integer, Integer>>();
+        sdom = sdomBuilder(Integer.valueOf(dimension), highTemp, lowTemp);
+        log.trace("sdom 0 " + sdom.get(0).fst + " " +sdom.get(0).snd);
+        BufferedReader rd = returnStream(rangeSet, "tupleList");
+        String data = bufferedToString(rd,sdom.get(0).snd - sdom.get(0).fst+1, sdom.get(1).snd -sdom.get(1).fst +1);
+        String rasQuery = 
+            RASQL_UPDATE + " " + collName + " as m " + 
+            RASQL_SET + " m" + sdomString + " " +
+            RASQL_ASSIGN + " (" + baseType + ") " + "<" + sdomString + " " + data + ">"
+            ;
+        //log.debug("RasQl Query : " + rasQuery);
+        try {
+            RasUtil.executeRasqlQuery(rasQuery, user, pass, writeFlag);
+        } catch (RasdamanException ex) {
+            throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+        }     
     }
+    /*
+    public void insert2DCoverage(String collName, List<Pair<Integer, Integer>> coordinate, String data, String type) throws PetascopeException {
+        Object obj = null;
+        String user = "rasadmin"; 
+        String pass = "rasadmin";
+        boolean writeFlag = true;
+        BigInteger collOid = getCollOid(collName);
+        Pair<String, String> i = getIndexDomain(collName, collOid, 0);
+        Pair<String, String> j = getIndexDomain(collName, collOid, 1);
+        int sizej = Integer.parseInt(j.snd) - Integer.parseInt(j.fst) + 1;
+        int sizei = Integer.parseInt(i.snd) - Integer.parseInt(i.fst) + 1;
+        List<Integer> indices = returnIndices(data, sizej);
+        System.out.print(indices);
+        System.out.println(sizei);
+        for (int k = 0; k< sizei; k++) {
+            System.out.println("the value of k :" + k);
+            if ( k == 0)  {
+                String rasQuery = 
+                        RASQL_UPDATE + " " + collName + " as m " + 
+                        RASQL_SET + " m[" + (Integer.parseInt(i.fst)+k) + "," + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " +
+                        RASQL_ASSIGN + " (" + type + ") " + "<[" + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " + data.subSequence(0, indices.get(0)) + ">"
+                        ;
+                log.debug("RasQl Query : " + rasQuery);
+                log.debug("data : "  + data.substring(0, indices.get(0)));
+                try {
+                    RasUtil.executeRasqlQuery(rasQuery, user, pass, true);
+                } catch (RasdamanException ex) {
+                    throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+                }                
+            } else if (k == (sizei-1)) {
+                int tempDim = Integer.parseInt(i.fst) + k;
+                String rasQuery = 
+                        RASQL_UPDATE + " " + collName + " as m " + 
+                        RASQL_SET + " m[" + tempDim + "," + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " +
+                        RASQL_ASSIGN + " (" + type + ") " + "<[" + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " + data.substring(indices.get(k-1)+1) + ">"
+                        ;
+                log.debug("RasQl Query : " + rasQuery);
+                log.debug("data : "  + data.substring(indices.get(k-1)+1));
+                try {
+                    RasUtil.executeRasqlQuery(rasQuery, user, pass, true);
+                } catch (RasdamanException ex) {
+                    throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+                }
+            } else {
+                int tempDim = Integer.parseInt(i.fst) + k;
+                String rasQuery = 
+                        RASQL_UPDATE + " " + collName + " as m " + 
+                        RASQL_SET + " m[" + tempDim + "," + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " +
+                        RASQL_ASSIGN + " (" + type + ") " + "<[" + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " + data.substring(indices.get(k-1)+1, indices.get(k)) + ">"
+                        ;
+                log.debug("RasQl Query : " + rasQuery);
+                log.debug("data : "  + data.substring(indices.get(k-1)+1, indices.get(k)));
+                try {
+                    RasUtil.executeRasqlQuery(rasQuery, user, pass, true);
+                } catch (RasdamanException ex) {
+                    throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+                }
+            }           
+        }
+    }
+    */
     
     public void delete(CoverageMetadata meta, boolean commit) throws PetascopeException {
         String coverageName = meta.getCoverageName();

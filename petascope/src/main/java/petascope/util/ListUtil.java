@@ -110,7 +110,6 @@ public class ListUtil {
                 tmp = o.toString();
             }
             if (!s.equals("")) {
-                s += "\n";
                 s += tmp;
             } else {
                 s += tmp;
@@ -357,10 +356,40 @@ public class ListUtil {
         }
     }
     
-    public static List<String> returnMarray(String data, int size) {
-        List<String> marray = new ArrayList<String>();
-        
-        
-        return marray;
+    public static List<Integer> returnIndices(String data, int size) {
+        List<Integer> indices = new ArrayList<Integer>();
+        int count = 0;
+        int idx = 0;
+        for (int i = 0; i < data.length(); i++) {
+            if (Character.toString(data.charAt(i)).compareTo(",") == 0) {
+                idx = i;
+                count++;
+                if (count % size == 0) {
+                    indices.add(idx);
+                }
+            } else {
+                continue;
+            }
+        }
+        return indices;
+    }
+    
+        /**
+     * takes the dimension, and the sdom of the coverage and returns the sdom
+     * valid for any dimension
+     * @param dimension     dimension of the coverage data
+     * @param hightTemp     string that contains the high values of the sdom returnValue(domainSet, "high")
+     * @param lowTemp       string that contains the low values of the sdom returnValue(domainSet, "low")
+     * @return 
+     */
+    public static List<Pair<Integer, Integer>> sdomBuilder(int dimension, String highTemp, String lowTemp) {
+        List<Pair<Integer, Integer>> sdom = new ArrayList<Pair<Integer, Integer>>();
+        for (int i =0; i<dimension; i++) {
+            int high = Integer.valueOf(highTemp.split(" ")[i]);
+            int low = Integer.valueOf(lowTemp.split(" ")[i]);
+            Pair<Integer,Integer> coordinate = Pair.of(low,high);       
+            sdom.add(coordinate);
+        }
+        return sdom;
     }
 }

@@ -40,7 +40,7 @@ import nu.xom.Builder;
 import nu.xom.Document;
 import nu.xom.Element;
 import nu.xom.ParsingException;
-import petascope.wcsTtransaction.parsers.InsertCoverageRequest;
+import petascope.wcsTransaction.parsers.InsertCoverageRequest;
 import petascope.wcs2.handlers.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +52,11 @@ import petascope.exceptions.SecoreException;
 import petascope.exceptions.WCSException;
 import static petascope.util.CrsUtil.*;
 import static petascope.util.CrsUtil.getCrsUris;
+import static petascope.util.ListUtil.ltos;
 import petascope.util.Pair;
+import petascope.util.StringUtil;
+import static petascope.util.StringUtil.bufferedToString;
+import static petascope.util.StringUtil.sdomToStringBuilder;
 import static petascope.util.XMLSymbols.LABEL_COVERAGE_DESCRIPTIONS;
 import static petascope.util.XMLSymbols.NAMESPACE_WCS;
 import static petascope.util.XMLUtil.serialize;
@@ -79,14 +83,15 @@ public class InsertCoverageHandler extends AbstractRequestHandler<InsertCoverage
     
     public InsertCoverageHandler(DbMetadataSource meta) {
         super(meta);
-    }
+    }  
+    
     
     @Override
     public Response handle(InsertCoverageRequest request) throws WCSException, PetascopeException, SecoreException {
         Document ret = constructDocument(LABEL_COVERAGE_DESCRIPTIONS, NAMESPACE_WCS);
         Element root = null;
         //String url = request.getCoverageRef();
-        String url = "http://localhost:8080/rasdaman/?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=rgb";
+        String url = "http://localhost:8080/rasdaman/?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=mean_summer_airtemp";
         Document coverage = null;
         Builder parser = new Builder();
         Set<Pair<String, String>> namespaceSet = new HashSet<Pair<String, String>>();
@@ -101,41 +106,41 @@ public class InsertCoverageHandler extends AbstractRequestHandler<InsertCoverage
             java.util.logging.Logger.getLogger(InsertCoverageHandler.class.getName()).log(Level.SEVERE, null, ex);
         }
          
-        
         //Preparing to insert into rasdaman
-        List<Pair<Integer,Integer>> axis = new ArrayList();
+        List<Pair<Integer,Integer>> sdom = new ArrayList();
         Element domainSet = root.getFirstChildElement("domainSet", returnNamespaceUrl("gml", namespaceSet));
         String highTemp = returnValue(domainSet, "high");
         String lowTemp = returnValue(domainSet, "low");
         String dimension = returnAttributeValue(domainSet, "dimension");
         log.trace("dimension = " + Integer.valueOf(dimension));
-        for (int i =0; i<Integer.valueOf(dimension); i++) {
-            int high = Integer.valueOf(highTemp.split(" ")[i]);
-            int low = Integer.valueOf(lowTemp.split(" ")[i]);
-            Pair<Integer,Integer> coordinate = Pair.of(low,high);       
-            axis.add(coordinate);
-            log.trace("low:high = "+low+ " : " + high);
-        }
+        String sdomString = sdomToStringBuilder(Integer.valueOf(dimension), highTemp, lowTemp);
+        log.trace(("Strng format " + sdomString));
         Element rangeSet = root.getFirstChildElement("rangeSet", returnNamespaceUrl("gml", namespaceSet));
-        //String dataTemp = returnValue(rangeSet, "tupleList");
-        //log.trace(dataTemp);
+        
+        
+        String collName = "multijava";
+        String collType = "GreySet";
+        String baseType = "char";
+        meta.createCollection(collName, collType);
+        meta.initializeCollection(collName,domainSet,baseType);
+        meta.insertCoverage(collName, domainSet, rangeSet, baseType);
+        
+        
+        //Element rangeSet = root.getFirstChildElement("rangeSet", returnNamespaceUrl("gml", namespaceSet));
         String cs = returnAttributeValue(rangeSet, "tupleList", "cs");
         log.trace(cs);
         String ts = returnAttributeValue(rangeSet, "tupleList", "ts");
         log.trace(ts);
-        List<String> data = new ArrayList();
-        BufferedReader rd = returnStream(rangeSet, "tupleList");
-        try {
-            StringTokenizer token = new StringTokenizer(rd.readLine(), ",");
-            while(token.hasMoreElements()) {
-                data.add(token.nextToken());
-            }
-            System.out.println("**********************");
-            
-        } catch (IOException ex) {
-            java.util.logging.Logger.getLogger(InsertCoverageHandler.class.getName()).log(Level.SEVERE, null, ex);
-        }
+      
         
+       
+        
+        System.out.println("inserting into rasdaman portion"); 
+        String testdata = "1,2,3,4,5,2,3,6,5,4,3,5,6,8,9";
+        
+       
+        
+       
         
         
         /*

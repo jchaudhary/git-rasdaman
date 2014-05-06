@@ -20,28 +20,40 @@
  * or contact Peter Baumann via <baumann@rasdaman.com>.
  */
 
-package petascope.util;
+package petascope.wcsTransaction.parsers;
 
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
+import petascope.util.KVPSymbols;
+import petascope.util.ListUtil;
+import petascope.wcs2.parsers.BaseRequest;
 
 /**
  *
  * @author rasdaman
  */
-public class TypeConstants {
-    public static HashMap<String, String> TYPE_CONSTANTS= new HashMap<String, String>();
-    public static void init() {
-        TYPE_CONSTANTS.put("char", "c");
-        TYPE_CONSTANTS.put("octet", "o");
-        TYPE_CONSTANTS.put("short", "s");
-        TYPE_CONSTANTS.put("unsigned short", "us");
-        TYPE_CONSTANTS.put("long", "l");
-        TYPE_CONSTANTS.put("unsigned long", "ul");
-        TYPE_CONSTANTS.put("float", "f");
-        TYPE_CONSTANTS.put("double", "d");
+public class DeleteCoverageRequest  extends BaseRequest {
+    
+    /*WCS DeleteCoverage request constant*/
+    public static final String VALUE_DELETECOVERAGE = "DeleteCoverage";
+    
+    /**
+     * List of Coverage Ids that we want to delete
+     * Shall contain either contain at least one Id or more than one Id
+     */
+    private final List<String> coverageIds;
+    
+    public DeleteCoverageRequest() {
+        this.coverageIds = new ArrayList<String>();
     }
     
-    public static HashMap<String, String> getTypeConstants() {
-        return TYPE_CONSTANTS;
+    public List<String> getCoverageIds() {
+        return this.coverageIds;
+    }
+    
+  @Override
+    public String toString() {
+        return VALUE_DELETECOVERAGE + ": " +
+                KVPSymbols.KEY_COVERAGEID + "s= " + ListUtil.ltos(coverageIds,",");
     }
 }

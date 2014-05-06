@@ -21,6 +21,8 @@
  */
 package petascope.util;
 
+import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -34,6 +36,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import petascope.util.ListUtil;
+import static petascope.util.ListUtil.returnIndices;
 
 /**
  * String utilities.
@@ -423,5 +429,49 @@ public class StringUtil {
         }
 
         return outList;
+    }
+    
+    /**
+     * takes the dimension, and the sdom of the coverage and returns the sdom in the form [*:*,*:*,......]
+     * @param dimension     dimension of the coverage data
+     * @param highTemp      string that contains the high values of the sdom returnValue(domainSet, "high")
+     * @param lowTemp       string that contains the high values of the sdom returnValue(domainSet, "low")
+     * @return 
+     */
+    public static String sdomToStringBuilder(int dimension, String highTemp, String lowTemp) {
+        String sdom = "[";
+        for (int i =0; i<dimension; i++) {
+            int high = Integer.valueOf(highTemp.split(" ")[i]);
+            int low = Integer.valueOf(lowTemp.split(" ")[i]);
+            if (i == (dimension -1)) {
+                sdom = sdom + low + ":" + high + "]";
+            } else {
+                sdom = sdom + low + ":" + high + ",";
+            }
+        }
+        return sdom;
+    }
+    
+    public static String bufferedToString(BufferedReader rd, int sizei, int sizej) {
+        String result = "";
+        List<Integer> indices = new ArrayList<Integer>();
+        String temp = "";
+        try {  
+            temp = rd.readLine();
+            indices = returnIndices(temp, sizei);
+        } catch (IOException ex) {
+            Logger.getLogger(StringUtil.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        System.out.println(indices);
+        result = temp.substring(0, indices.get(0));
+        for (int i = 1; i < sizej; i++) {
+            System.out.println("iteration :" + i);
+            if (i == indices.size()) {
+                result += ";"+temp.substring(indices.get(i-1)+1);
+            } else {
+                result += ";"+temp.substring(indices.get(i-1)+1, indices.get(i));
+            }
+        }
+        return result;
     }
 }

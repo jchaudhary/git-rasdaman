@@ -26,7 +26,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.logging.Level;
 import nu.xom.Document;
-import petascope.wcsTtransaction.parsers.DeleteCoverageRequest;
+import petascope.wcsTransaction.parsers.DeleteCoverageRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import petascope.core.DbMetadataSource;
