@@ -117,15 +117,20 @@ public class InsertCoverageHandler extends AbstractRequestHandler<InsertCoverage
         log.trace(("Strng format " + sdomString));
         Element rangeSet = root.getFirstChildElement("rangeSet", returnNamespaceUrl("gml", namespaceSet));
         
+        System.out.println(meta.getCoverageId("rgb"));
         
-        String collName = "multijava";
+        String collName = "testhour";
         String collType = "GreySet";
         String baseType = "char";
-        meta.createCollection(collName, collType);
-        meta.initializeCollection(collName,domainSet,baseType);
-        meta.insertCoverage(collName, domainSet, rangeSet, baseType);
-        
-        
+        //meta.createCollection(collName, collType);
+        //meta.initializeCollection(collName,domainSet,baseType);
+        /*
+        try {
+            meta.insertCollection(collName, domainSet, rangeSet, baseType);
+        } catch (IOException ex) {
+            java.util.logging.Logger.getLogger(InsertCoverageHandler.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        */
         //Element rangeSet = root.getFirstChildElement("rangeSet", returnNamespaceUrl("gml", namespaceSet));
         String cs = returnAttributeValue(rangeSet, "tupleList", "cs");
         log.trace(cs);
@@ -133,7 +138,19 @@ public class InsertCoverageHandler extends AbstractRequestHandler<InsertCoverage
         log.trace(ts);
       
         
-       
+        /*
+        meta.createCollection("laddu", "GreySet");
+        List<Pair<Integer, Integer>> coordinate = new ArrayList<Pair<Integer, Integer>>();
+        Pair a= Pair.of("0", "885");
+        Pair b = Pair.of("0", "710");
+        coordinate.add(a);
+        coordinate.add(b);
+        meta.initialize2DCollection(coordinate, "laddu", "char");
+        meta.insert2DCoverage("laddu", coordinate, returnValue(rangeSet, "tupleList"), baseType);
+        */
+        
+        
+        
         
         System.out.println("inserting into rasdaman portion"); 
         String testdata = "1,2,3,4,5,2,3,6,5,4,3,5,6,8,9";

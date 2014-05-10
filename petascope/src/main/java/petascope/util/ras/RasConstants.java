@@ -40,6 +40,7 @@ public interface RasConstants {
     public static final String RASQL_COLLECTION        = "collection";
     public static final String RASQL_COMPLEX           = "complex";
     public static final String RASQL_CREATE            = "create";
+    public static final String RASQL_DROP              = "drop";
     public static final String RASQL_ELSE              = "else";
     public static final String RASQL_ENCODE            = "encode";
     public static final String RASQL_END               = "end";

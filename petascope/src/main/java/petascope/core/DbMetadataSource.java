@@ -22,6 +22,13 @@
 package petascope.core;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Array;
@@ -86,6 +93,8 @@ import petascope.wcs2.parsers.BaseRequest;
 import petascope.util.ListUtil;
 import static petascope.util.ListUtil.sdomBuilder;
 import static petascope.util.StringUtil.bufferedToString;
+import static petascope.util.StringUtil.structStringBuilder;
+import static petascope.util.StringUtil.tempStringToString;
 import static petascope.util.XMLUtil.returnStream;
 
 /**
@@ -1307,313 +1316,6 @@ public class DbMetadataSource implements IMetadataSource {
         }
     }
 
-    /** Write a coverage's metadata to the database. This function can be used
-     * for both inserting new coverages and updating coverage metadata.
-     *
-     * @param meta CoverageMetadata container for the information to be stored in the metadata database
-     * @param commit Boolean value, specifying if we want to commit immediately or not
-     * @throws PetascopeException
-     */
-    // TODO (WCS-T)
-    private void write(CoverageMetadata meta, boolean commit) throws PetascopeException {
-        String coverageName = meta.getCoverageName();
-        if (existsCoverageName(coverageName)) {
-            updateCoverageMetadata(meta, commit);
-        } else {
-            insertNewCoverageMetadata(meta, commit);
-        }        
-    }
-    
-    public void insertNewCoverageMetadata(CoverageMetadata meta, boolean commit) {
-        int coverageId = meta.getCoverageId();    // Used when reading metadata from the DB
-        List<CellDomainElement> cellDomain = meta.getCellDomainList();
-        List<DomainElement> domain = meta.getDomainList();
-        String coverageName = meta.getCoverageName();
-        String coverageType = meta.getCoverageType();
-        String nativeFormat = meta.getNativeFormat();
-        List<String> crsUris = meta.getCrsUris(); // 1+ single CRS URIs
-        Set<Pair<String,String>> extraMetadata = meta.getExtraMetadata(); // {metadata_type,metadata_value}
-        
-        List<RangeElement> range = null;
-        Iterator<RangeElement> itRangeElement = meta.getRangeIterator();
-        while (itRangeElement.hasNext()) {
-            range.add(itRangeElement.next());
-        }
-        
-        Iterator<AbstractSimpleComponent> itAbstract = meta.getSweComponentsIterator();
-        List<AbstractSimpleComponent> sweComponents = null;
-        while(itAbstract.hasNext()) {
-            sweComponents.add(itAbstract.next());
-        }
-        
-        Pair<BigInteger, String> rasdamanCollection =  meta.getRasdamanCollection();
-        Bbox bbox = meta.getBbox();
-    }
-    
-    //TOO
-    public void updateCoverageMetadata(CoverageMetadata meta, boolean commit) {
-        
-    }
-    
-    public void createCollection(String collName, String collType) throws PetascopeException {
-        Object obj = null;
-        String user = "rasadmin";
-        String pass = "rasadmin";
-        boolean writeFlag = true;
-        String rasQuery =
-                RASQL_CREATE + " " + RASQL_COLLECTION + " " + collName + " " + collType + " --user rasadmin --passwd rasadmin"
-                ;
-        log.debug("RasQL Query : " + rasQuery);
-        try {
-            obj = RasUtil.executeRasqlQuery(rasQuery, user, pass, writeFlag);
-        } catch (RasdamanException ex) {
-            throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
-        }
-    }
-    /*
-    public void initialize2DCollection(List<Pair<Integer, Integer>> coordinate, String collName, String type) throws PetascopeException {
-        Object obj = null;
-        TypeConstants typeConstants = new TypeConstants();
-        typeConstants.init();
-        String postfixChar =typeConstants.getTypeConstants().get(type);
-        
-        String user = "rasadmin";
-        String pass = "rasadmin";
-        boolean writeFlag = true;
-        String rasQuery =
-                RASQL_INSERT + " into " + collName + " " +
-                RASQL_VALUES + " " + RASQL_MARRAY + " x in " + "[" + coordinate.get(0).fst + ":" + coordinate.get(0).snd + "," + coordinate.get(1).fst + ":" + coordinate.get(1).snd + "] " +
-                RASQL_VALUES + " 0" + postfixChar
-                ;
-        log.debug("RasQl Query : " + rasQuery);
-        try {
-            obj = RasUtil.executeRasqlQuery(rasQuery, user, pass, true);
-        } catch (RasdamanException ex) {
-            throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
-        }
-    }
-    */
-    
-    /**
-     * initializes the given collection with null data given the spatial domain and the base type
-     * @param collName      name of the collection
-     * @param sdom          spatial domain of the collection
-     * @param type          base type
-     * @throws PetascopeException   
-     */
-    public void initializeCollection(String collName, Element domainSet, String baseType) throws PetascopeException {
-        Object obj = null;
-        TypeConstants typeConstants = new TypeConstants();
-        typeConstants.init();
-        String postfixChar =typeConstants.getTypeConstants().get(baseType);
-        String highTemp = returnValue(domainSet, "high");
-        String lowTemp = returnValue(domainSet, "low");
-        String dimension = returnAttributeValue(domainSet, "dimension");
-        String sdom = sdomToStringBuilder(Integer.valueOf(dimension), highTemp, lowTemp);
-        String user = "rasadmin";
-        String pass = "rasadmin";
-        boolean writeFlag = true;
-        String rasQuery =
-                RASQL_INSERT + " into " + collName + " " +
-                RASQL_VALUES + " " + RASQL_MARRAY + " x in " + sdom + " " +
-                RASQL_VALUES + " 0" + postfixChar
-                ;
-        log.debug("RasQl Query : " + rasQuery);
-        try {
-            obj = RasUtil.executeRasqlQuery(rasQuery, user, pass, true);
-        } catch (RasdamanException ex) {
-            throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
-        }
-        log.trace("Successful Initialization of :" + collName);
-    }
-    
-    
-    public void insertCoverage(String collName, Element domainSet, Element rangeSet, String baseType) throws PetascopeException {
-        Object obj = null;
-        String user = "rasadmin"; 
-        String pass = "rasadmin";
-        boolean writeFlag = true;
-        String highTemp = returnValue(domainSet, "high");
-        String lowTemp = returnValue(domainSet, "low");
-        String dimension = returnAttributeValue(domainSet, "dimension");
-        String sdomString = sdomToStringBuilder(Integer.valueOf(dimension), highTemp, lowTemp);
-        List<Pair<Integer, Integer>> sdom = new ArrayList<Pair<Integer, Integer>>();
-        sdom = sdomBuilder(Integer.valueOf(dimension), highTemp, lowTemp);
-        log.trace("sdom 0 " + sdom.get(0).fst + " " +sdom.get(0).snd);
-        BufferedReader rd = returnStream(rangeSet, "tupleList");
-        String data = bufferedToString(rd,sdom.get(0).snd - sdom.get(0).fst+1, sdom.get(1).snd -sdom.get(1).fst +1);
-        String rasQuery = 
-            RASQL_UPDATE + " " + collName + " as m " + 
-            RASQL_SET + " m" + sdomString + " " +
-            RASQL_ASSIGN + " (" + baseType + ") " + "<" + sdomString + " " + data + ">"
-            ;
-        //log.debug("RasQl Query : " + rasQuery);
-        try {
-            RasUtil.executeRasqlQuery(rasQuery, user, pass, writeFlag);
-        } catch (RasdamanException ex) {
-            throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
-        }     
-    }
-    /*
-    public void insert2DCoverage(String collName, List<Pair<Integer, Integer>> coordinate, String data, String type) throws PetascopeException {
-        Object obj = null;
-        String user = "rasadmin"; 
-        String pass = "rasadmin";
-        boolean writeFlag = true;
-        BigInteger collOid = getCollOid(collName);
-        Pair<String, String> i = getIndexDomain(collName, collOid, 0);
-        Pair<String, String> j = getIndexDomain(collName, collOid, 1);
-        int sizej = Integer.parseInt(j.snd) - Integer.parseInt(j.fst) + 1;
-        int sizei = Integer.parseInt(i.snd) - Integer.parseInt(i.fst) + 1;
-        List<Integer> indices = returnIndices(data, sizej);
-        System.out.print(indices);
-        System.out.println(sizei);
-        for (int k = 0; k< sizei; k++) {
-            System.out.println("the value of k :" + k);
-            if ( k == 0)  {
-                String rasQuery = 
-                        RASQL_UPDATE + " " + collName + " as m " + 
-                        RASQL_SET + " m[" + (Integer.parseInt(i.fst)+k) + "," + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " +
-                        RASQL_ASSIGN + " (" + type + ") " + "<[" + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " + data.subSequence(0, indices.get(0)) + ">"
-                        ;
-                log.debug("RasQl Query : " + rasQuery);
-                log.debug("data : "  + data.substring(0, indices.get(0)));
-                try {
-                    RasUtil.executeRasqlQuery(rasQuery, user, pass, true);
-                } catch (RasdamanException ex) {
-                    throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
-                }                
-            } else if (k == (sizei-1)) {
-                int tempDim = Integer.parseInt(i.fst) + k;
-                String rasQuery = 
-                        RASQL_UPDATE + " " + collName + " as m " + 
-                        RASQL_SET + " m[" + tempDim + "," + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " +
-                        RASQL_ASSIGN + " (" + type + ") " + "<[" + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " + data.substring(indices.get(k-1)+1) + ">"
-                        ;
-                log.debug("RasQl Query : " + rasQuery);
-                log.debug("data : "  + data.substring(indices.get(k-1)+1));
-                try {
-                    RasUtil.executeRasqlQuery(rasQuery, user, pass, true);
-                } catch (RasdamanException ex) {
-                    throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
-                }
-            } else {
-                int tempDim = Integer.parseInt(i.fst) + k;
-                String rasQuery = 
-                        RASQL_UPDATE + " " + collName + " as m " + 
-                        RASQL_SET + " m[" + tempDim + "," + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " +
-                        RASQL_ASSIGN + " (" + type + ") " + "<[" + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " + data.substring(indices.get(k-1)+1, indices.get(k)) + ">"
-                        ;
-                log.debug("RasQl Query : " + rasQuery);
-                log.debug("data : "  + data.substring(indices.get(k-1)+1, indices.get(k)));
-                try {
-                    RasUtil.executeRasqlQuery(rasQuery, user, pass, true);
-                } catch (RasdamanException ex) {
-                    throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
-                }
-            }           
-        }
-    }
-    */
-    
-    public void delete(CoverageMetadata meta, boolean commit) throws PetascopeException {
-        String coverageName = meta.getCoverageName();
-        if (existsCoverageName(coverageName) == false) {
-            throw new PetascopeException(ExceptionCode.ResourceError,
-                    "Cannot delete inexistent coverage: " + coverageName);
-        }
-
-        /* Delete main coverage entry from "PS_Coverage". Auxiliary metadata are
-         * automatically deleted by the DB (via CASCADING) on
-         * deletion of the main entry in ps_coverage */
-        Statement s = null;
-        try {
-            s = conn.createStatement();
-            String sqlQuery =
-                    "DELETE FROM " + TABLE_COVERAGE +
-                    " WHERE "      + COVERAGE_NAME  + "='" + coverageName + "'"
-                    ;
-            log.debug("SQL query : " + sqlQuery);
-            setQuery(sqlQuery);
-            int count = s.executeUpdate(query);
-            log.trace("Affected rows: " + count);
-            s.close();
-
-            if (commit) {
-                commitAndClose();
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                s.close();
-            } catch (Exception e) {
-            }
-        }
-    }
-    /**
-     * Given the list of coverageIds this method deletes them from the database
-     * @param coverageIds
-     * @param commit
-     * @throws PetascopeException 
-     */
-    
-    public void delete(List<String> coverageIds, boolean commit) throws PetascopeException {
-        for (String coverageName: coverageIds) {
-            if (existsCoverageName(coverageName) == false) {
-            throw new PetascopeException(ExceptionCode.ResourceError,
-                "Cannot delete inexistent coverage: " + coverageName);
-            }
-            Statement s = null;
-            try {
-                s = conn.createStatement();
-                String sqlQuery =
-                    "DELETE FROM " + TABLE_COVERAGE +
-                    " WHERE "      + COVERAGE_NAME  + "='" + coverageName + "'"
-                    ;
-                log.debug("SQL query : " + sqlQuery);
-                setQuery(sqlQuery);
-                int count = s.executeUpdate(query);
-                log.trace("Affected rows: " + count);
-                s.close();
-
-                if (commit) {
-                    commitAndClose();
-                }
-            } catch (SQLException e) {
-                e.printStackTrace();
-            } finally {
-                try {
-                    s.close();
-                } catch (Exception e) {
-                }
-            }
-        } 
-    }
-
-    public int getGmlSubtypeId(String gmlSubType) throws PetascopeException {
-        int gmlSubTypeId = 0;
-        try {
-            Statement s = null;
-            s = conn.createStatement();
-            String sqlQuery =
-                    "SELECT id FROM " + TABLE_GML_SUBTYPE +
-                    " WHERE " + GML_SUBTYPE_SUBTYPE + " = " + "'" + gmlSubType + "'"
-                    ;
-            log.debug("SQL Query : " + sqlQuery);
-            setQuery(sqlQuery);
-            ResultSet r = s.executeQuery(query);
-            while (r.next()) {
-                gmlSubTypeId = r.getInt("id");
-            }
-            log.trace("gml_subtype_id for " + gmlSubType + " : " + gmlSubTypeId);
-            s.close();
-        } catch (SQLException ex) {
-            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        return gmlSubTypeId;
-    }
-    
     /**
      * Check if there is metadata available for a given coverage name
      * @param name coverage name
@@ -2186,86 +1888,6 @@ public class DbMetadataSource implements IMetadataSource {
         return bounds;
     }
     
-    /**
-     * Get Oid of a specified coverage from rasdaman
-     * @param collName      The name of the collection
-     * @return              The Oid of the collection
-     * @throws PetascopeException 
-     */
-    public BigInteger getCollOid(String collName) throws PetascopeException {
-        Object obj = null;
-        String rasQuery =
-            RASQL_SELECT + " " + RASQL_OID + "(c)" +
-            RASQL_FROM   + " " + collName + " " + RASQL_AS + " c " 
-            ;
-        
-        log.debug("RasQL Query : " + rasQuery);
-        try {
-            obj = RasUtil.executeRasqlQuery(rasQuery);
-        } catch (RasdamanException ex) {
-            throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
-        }
-        BigInteger oid = null;
-        String result;
-        if (obj != null) {
-            RasQueryResult res = new RasQueryResult(obj);
-            if (!res.getScalars().isEmpty()) {
-                result = res.getScalars().get(0);
-            } else {
-                log.error("Oid of collection " + collName + " was not found.");
-                throw new PetascopeException(ExceptionCode.InvalidCoverageConfiguration,
-                    "Oid of collection " + collName + " was not found: does not exist in " + TABLE_RASDAMAN_COLLECTION);
-            }
-        } else {
-            log.error("Empty response from rasdaman.");
-            throw new PetascopeException(ExceptionCode.RasdamanError, "Empty response from rasdaman.");
-        }
-        String oidstr = (result.replaceFirst(".*?(\\d+).*", "$1"));
-        oid = BigInteger.valueOf(Integer.parseInt(oidstr));
-        log.debug("Oid = " + oid);
-        return oid;
-    }
-    
-    /**
-     * Returns the coverage id of the specified coverage from ps_coverage
-     * @param name          name of the coverage
-     * @return              id of the coverage
-     * @throws PetascopeException 
-     */
-    public int getCoverageId(String name) throws PetascopeException {
-        int id = 0;
-        Statement s = null;
-        try {
-            ensureConnection();
-            s= conn.createStatement();
-            String sqlQuery = 
-                "SELECT " + COVERAGE_ID +
-                " FROM " + TABLE_COVERAGE + 
-                " WHERE " + COVERAGE_NAME + " = " + "\'"+name + "\'"
-                ;
-            log.debug("SQLQuery : " + sqlQuery);
-            ResultSet r = s.executeQuery(sqlQuery);
-            
-            while (r.next()) {
-                id = r.getInt("id");    
-            }
-            log.debug("id = " + id);
-        } catch (SQLException sqle) {
-            /* Abort this transaction */
-            try {
-                if (s != null) {
-                    s.close();
-                }
-                abortAndClose();
-            } catch (SQLException f) {
-                log.warn(f.getMessage());
-            }
-            throw new PetascopeException(ExceptionCode.InvalidRequest,
-                    "Metadata database error", sqle);
-            }               
-        return id;
-    }
-    
     public ResultSet executePostGISQuery(String postGisQuery) throws PetascopeException{
         Statement s = null;
         ResultSet r = null;
@@ -2579,5 +2201,1241 @@ public class DbMetadataSource implements IMetadataSource {
         }
 
         return sweQuantity;
+    }
+    
+    
+    /** Write a coverage's metadata to the database. This function can be used
+     * for both inserting new coverages and updating coverage metadata.
+     *
+     * @param meta CoverageMetadata container for the information to be stored in the metadata database
+     * @param commit Boolean value, specifying if we want to commit immediately or not
+     * @throws PetascopeException
+     */
+    // TODO (WCS-T)
+    private void write(CoverageMetadata meta, boolean commit) throws PetascopeException {
+        String coverageName = meta.getCoverageName();
+        if (existsCoverageName(coverageName)) {
+            updateCoverageMetadata(meta, commit);
+        } else {
+            insertNewCoverageMetadata(meta, commit);
+        }        
+    }
+    
+    public void insertNewCoverageMetadata(CoverageMetadata meta, boolean commit) {
+        int coverageId = meta.getCoverageId();    // Used when reading metadata from the DB
+        List<CellDomainElement> cellDomain = meta.getCellDomainList();
+        List<DomainElement> domain = meta.getDomainList();
+        String coverageName = meta.getCoverageName();
+        String coverageType = meta.getCoverageType();
+        String nativeFormat = meta.getNativeFormat();
+        List<String> crsUris = meta.getCrsUris(); // 1+ single CRS URIs
+        Set<Pair<String,String>> extraMetadata = meta.getExtraMetadata(); // {metadata_type,metadata_value}
+        
+        List<RangeElement> range = null;
+        Iterator<RangeElement> itRangeElement = meta.getRangeIterator();
+        while (itRangeElement.hasNext()) {
+            range.add(itRangeElement.next());
+        }
+        
+        Iterator<AbstractSimpleComponent> itAbstract = meta.getSweComponentsIterator();
+        List<AbstractSimpleComponent> sweComponents = null;
+        while(itAbstract.hasNext()) {
+            sweComponents.add(itAbstract.next());
+        }
+        
+        Pair<BigInteger, String> rasdamanCollection =  meta.getRasdamanCollection();
+        Bbox bbox = meta.getBbox();
+    }
+    
+    //TOO
+    public void updateCoverageMetadata(CoverageMetadata meta, boolean commit) {
+        
+    }
+    
+    /**
+     * creates collection of given name and given type 
+     * @param collName          name of the new collection
+     * @param collType          type of the new collection
+     * @throws PetascopeException 
+     */
+    public void createCollection(String collName, String collType) throws PetascopeException {
+        Object obj = null;
+        String user = "rasadmin";
+        String pass = "rasadmin";
+        boolean writeFlag = true;
+        String rasQuery =
+                RASQL_CREATE + " " + RASQL_COLLECTION + " " + collName + " " + collType + " --user rasadmin --passwd rasadmin"
+                ;
+        log.debug("RasQL Query : " + rasQuery);
+        try {
+            obj = RasUtil.executeRasqlQuery(rasQuery, user, pass, writeFlag);
+        } catch (RasdamanException ex) {
+            throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+        }
+    }
+    
+    /**
+     * initializes 2d collection given the axes co ordinates collectin name and the base type
+     * @param coordinate        axes coordinate
+     * @param collName          name of the collection
+     * @param type              base type
+     * @throws PetascopeException 
+     */
+    public void initialize2DCollection(List<Pair<Integer, Integer>> coordinate, String collName, String type) throws PetascopeException {
+        Object obj = null;
+        TypeConstants typeConstants = new TypeConstants();
+        typeConstants.init();
+        String postfixChar =typeConstants.getTypeConstants().get(type);
+        
+        String user = "rasadmin";
+        String pass = "rasadmin";
+        boolean writeFlag = true;
+        String rasQuery =
+                RASQL_INSERT + " into " + collName + " " +
+                RASQL_VALUES + " " + RASQL_MARRAY + " x in " + "[" + coordinate.get(0).fst + ":" + coordinate.get(0).snd + "," + coordinate.get(1).fst + ":" + coordinate.get(1).snd + "] " +
+                RASQL_VALUES + " 0" + postfixChar
+                ;
+        log.debug("RasQl Query : " + rasQuery);
+        try {
+            obj = RasUtil.executeRasqlQuery(rasQuery, user, pass, true);
+        } catch (RasdamanException ex) {
+            throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+        }
+    }
+    
+    
+    /**
+     * initializes the given collection with null data given the spatial domain and the base type
+     * @param collName      name of the collection
+     * @param sdom          spatial domain of the collection
+     * @param type          base type
+     * @throws PetascopeException   
+     */
+    public void initializeCollection(String collName, Element domainSet, String baseType) throws PetascopeException {
+        Object obj = null;
+        TypeConstants typeConstants = new TypeConstants();
+        typeConstants.init();
+        String postfixChar =typeConstants.getTypeConstants().get(baseType);
+        String highTemp = returnValue(domainSet, "high");
+        //String highTemp = "2 4 1";
+        String lowTemp = returnValue(domainSet, "low");
+        //String lowTemp = "0 0 0";
+        String dimension = returnAttributeValue(domainSet, "dimension");
+        //String dimension = "3";
+        String sdom = sdomToStringBuilder(Integer.valueOf(dimension), highTemp, lowTemp);
+        String user = "rasadmin";
+        String pass = "rasadmin";
+        boolean writeFlag = true;
+        String rasQuery =
+                RASQL_INSERT + " into " + collName + " " +
+                RASQL_VALUES + " " + RASQL_MARRAY + " x in " + sdom + " " +
+                RASQL_VALUES + " 0" + postfixChar
+                ;
+        log.debug("RasQl Query : " + rasQuery);
+        try {
+            obj = RasUtil.executeRasqlQuery(rasQuery, user, pass, writeFlag);
+        } catch (RasdamanException ex) {
+            throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+        }
+        log.trace("Successful Initialization of :" + collName);
+    }
+    
+    /**
+     * initializes collection of struct type. Specifically (RGB), struct{char R, char G. char B}
+     * @param collName
+     * @param domainSet
+     * @param baseType
+     * @throws PetascopeException 
+     */
+    public void initializeStructCollection(String collName, Element domainSet, String baseType) throws PetascopeException {
+        Object obj = null;
+        TypeConstants typeConstants = new TypeConstants();
+        typeConstants.init();
+        String postfixChar =typeConstants.getTypeConstants().get(baseType);
+        String highTemp = returnValue(domainSet, "high");
+        //String highTemp = "2 4 1";
+        String lowTemp = returnValue(domainSet, "low");
+        //String lowTemp = "0 0 0";
+        String dimension = returnAttributeValue(domainSet, "dimension");
+        //String dimension = "3";
+        String sdom = sdomToStringBuilder(Integer.valueOf(dimension), highTemp, lowTemp);
+        String user = "rasadmin";
+        String pass = "rasadmin";
+        boolean writeFlag = true;
+        String rasQuery =
+                RASQL_INSERT + " into " + collName + " " +
+                RASQL_VALUES + " " + RASQL_MARRAY + " x in " + sdom + " " +
+                RASQL_VALUES + "(" +baseType + ") " + "struct{0,0,0}"
+                ;
+        log.debug("RasQl Query : " + rasQuery);
+        try {
+            obj = RasUtil.executeRasqlQuery(rasQuery, user, pass, writeFlag);
+        } catch (RasdamanException ex) {
+            throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+        }
+        log.trace("Successful Initialization of :" + collName);
+    }
+    
+    /**
+     * insert coverage data 
+     * @param collName          name of the collection
+     * @param domainSet         the domain set xml element 
+     * @param rangeSet          the range set xml element
+     * @param baseType          base type
+     * @throws PetascopeException
+     * @throws IOException 
+     */
+    public void insertCollection(String collName, Element domainSet, Element rangeSet, String baseType) throws PetascopeException, IOException {
+        Object obj = null;
+        String user = "rasadmin"; 
+        String pass = "rasadmin";
+        boolean writeFlag = true;
+        String highTemp = returnValue(domainSet, "high");
+        //String highTemp = "2 4 1";
+        String lowTemp = returnValue(domainSet, "low");
+        //String lowTemp = "0 0 0";
+        String dimension = returnAttributeValue(domainSet, "dimension");
+        //String dimension = "3";
+        String sdomString = sdomToStringBuilder(Integer.valueOf(dimension), highTemp, lowTemp);
+        //String sdomString = "[0:2,0:4,0:1]";
+        List<Pair<Integer, Integer>> sdom = new ArrayList<Pair<Integer, Integer>>();
+        sdom = sdomBuilder(Integer.valueOf(dimension), highTemp, lowTemp);
+        String tempData = returnValue(rangeSet, "tupleList");
+        //log.trace(tempData);
+        //BufferedReader rd = returnStream(rangeSet, "tupleList");
+        //BufferedReader rd = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(("1,2,3,2,3,4,3,4,5,4,5,6,5,6,7,1,2,3,2,3,4,3,4,5,4,5,6,5,6,7").getBytes())));
+        //String data = bufferedToString(rd, sdom.get(0).snd - sdom.get(0).fst+1);
+        //rd.close();
+        String data = tempStringToString(tempData, sdom.get(0).snd - sdom.get(0).fst+1);
+        String rasQuery = 
+            RASQL_UPDATE + " " + collName + " as m " + 
+            RASQL_SET + " m" + sdomString + " " +
+            RASQL_ASSIGN + " (" + baseType + ") " + "<" + sdomString + " " + data + ">"
+            ;
+        //log.debug("RasQl Query : " + rasQuery);
+        try {
+            RasUtil.executeRasqlQuery(rasQuery, user, pass, writeFlag);
+        } catch (RasdamanException ex) {
+            throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+        }     
+    }
+    
+    /**
+     * insert coverage data (struct data type). Specifically struct{char R, char G, char B}
+     * @param collName          name of the collection
+     * @param domainSet         the domain set xml element
+     * @param rangeSet          the range set xml element
+     * @param baseType          base type
+     * @throws PetascopeException
+     * @throws IOException 
+     */
+    public void insertStructCoverage(String collName, Element domainSet, Element rangeSet, String baseType) throws PetascopeException, IOException {
+        Object obj = null;
+        String user = "rasadmin"; 
+        String pass = "rasadmin";
+        boolean writeFlag = true;
+        String highTemp = returnValue(domainSet, "high");
+        //String highTemp = "2 4 1";
+        String lowTemp = returnValue(domainSet, "low");
+        //String lowTemp = "0 0 0";
+        String dimension = returnAttributeValue(domainSet, "dimension");
+        //String dimension = "3";
+        String sdomString = sdomToStringBuilder(Integer.valueOf(dimension), highTemp, lowTemp);
+        //String sdomString = "[0:2,0:4,0:1]";
+        List<Pair<Integer, Integer>> sdom = new ArrayList<Pair<Integer, Integer>>();
+        sdom = sdomBuilder(Integer.valueOf(dimension), highTemp, lowTemp);
+        String tempData = returnValue(rangeSet, "tupleList");
+        
+        //log.trace(tempData);
+        //BufferedReader rd = returnStream(rangeSet, "tupleList");
+        //BufferedReader rd = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(("1,2,3,2,3,4,3,4,5,4,5,6,5,6,7,1,2,3,2,3,4,3,4,5,4,5,6,5,6,7").getBytes())));
+        //String data = bufferedToString(rd, sdom.get(0).snd - sdom.get(0).fst+1);
+        //rd.close();
+        String data = structStringBuilder(tempData, sdom.get(0).snd - sdom.get(0).fst+1);
+        String rasQuery = 
+            RASQL_UPDATE + " " + collName + " as m " + 
+            RASQL_SET + " m" + sdomString + " " +
+            RASQL_ASSIGN + " (" + baseType + ") " + "<" + sdomString + " " + data + ">"
+            ;
+        //log.debug("RasQl Query : " + rasQuery);
+        try {
+            RasUtil.executeRasqlQuery(rasQuery, user, pass, writeFlag);
+        } catch (RasdamanException ex) {
+            throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+        }     
+    }
+    
+    /**
+     * inserts 2D coverage data
+     * @param collName          name of the collection 
+     * @param coordinate        axes coordinates (sdom)
+     * @param data              the data to be inserted
+     * @param type              base type of the data to be inserted
+     * @throws PetascopeException 
+     */
+    public void insert2DCoverage(String collName, List<Pair<Integer, Integer>> coordinate, String data, String type) throws PetascopeException {
+        Object obj = null;
+        String user = "rasadmin"; 
+        String pass = "rasadmin";
+        boolean writeFlag = true;
+        BigInteger collOid = getCollOid(collName);
+        Pair<String, String> i = getIndexDomain(collName, collOid, 0);
+        Pair<String, String> j = getIndexDomain(collName, collOid, 1);
+        int sizej = Integer.parseInt(j.snd) - Integer.parseInt(j.fst) + 1;
+        int sizei = Integer.parseInt(i.snd) - Integer.parseInt(i.fst) + 1;
+        List<Integer> indices = returnIndices(data, sizej);
+        System.out.print(indices);
+        System.out.println(sizei);
+        for (int k = 0; k< sizei; k++) {
+            System.out.println("the value of k :" + k);
+            if ( k == 0)  {
+                String rasQuery = 
+                        RASQL_UPDATE + " " + collName + " as m " + 
+                        RASQL_SET + " m[" + (Integer.parseInt(i.fst)+k) + "," + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " +
+                        RASQL_ASSIGN + " (" + type + ") " + "<[" + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " + data.subSequence(0, indices.get(0)) + ">"
+                        ;
+                log.debug("RasQl Query : " + rasQuery);
+                log.debug("data : "  + data.substring(0, indices.get(0)));
+                try {
+                    RasUtil.executeRasqlQuery(rasQuery, user, pass, true);
+                } catch (RasdamanException ex) {
+                    throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+                }                
+            } else if (k == (sizei-1)) {
+                int tempDim = Integer.parseInt(i.fst) + k;
+                String rasQuery = 
+                        RASQL_UPDATE + " " + collName + " as m " + 
+                        RASQL_SET + " m[" + tempDim + "," + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " +
+                        RASQL_ASSIGN + " (" + type + ") " + "<[" + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " + data.substring(indices.get(k-1)+1) + ">"
+                        ;
+                log.debug("RasQl Query : " + rasQuery);
+                log.debug("data : "  + data.substring(indices.get(k-1)+1));
+                try {
+                    RasUtil.executeRasqlQuery(rasQuery, user, pass, true);
+                } catch (RasdamanException ex) {
+                    throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+                }
+            } else {
+                int tempDim = Integer.parseInt(i.fst) + k;
+                String rasQuery = 
+                        RASQL_UPDATE + " " + collName + " as m " + 
+                        RASQL_SET + " m[" + tempDim + "," + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " +
+                        RASQL_ASSIGN + " (" + type + ") " + "<[" + Integer.parseInt(j.fst) + ":" + Integer.parseInt(j.snd) + "] " + data.substring(indices.get(k-1)+1, indices.get(k)) + ">"
+                        ;
+                log.debug("RasQl Query : " + rasQuery);
+                log.debug("data : "  + data.substring(indices.get(k-1)+1, indices.get(k)));
+                try {
+                    RasUtil.executeRasqlQuery(rasQuery, user, pass, true);
+                } catch (RasdamanException ex) {
+                    throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+                }
+            }           
+        }
+    }
+    
+    /**
+     * delete coverage data 
+     * @param meta
+     * @param commit
+     * @throws PetascopeException 
+     */
+    public void delete(CoverageMetadata meta, boolean commit) throws PetascopeException {
+        String coverageName = meta.getCoverageName();
+        if (existsCoverageName(coverageName) == false) {
+            throw new PetascopeException(ExceptionCode.ResourceError,
+                    "Cannot delete inexistent coverage: " + coverageName);
+        }
+
+        /* Delete main coverage entry from "PS_Coverage". Auxiliary metadata are
+         * automatically deleted by the DB (via CASCADING) on
+         * deletion of the main entry in ps_coverage */
+        Statement s = null;
+        try {
+            s = conn.createStatement();
+            String sqlQuery =
+                    "DELETE FROM " + TABLE_COVERAGE +
+                    " WHERE "      + COVERAGE_NAME  + "='" + coverageName + "'"
+                    ;
+            log.debug("SQL query : " + sqlQuery);
+            setQuery(sqlQuery);
+            int count = s.executeUpdate(query);
+            log.trace("Affected rows: " + count);
+            s.close();
+
+            if (commit) {
+                commitAndClose();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                s.close();
+            } catch (Exception e) {
+            }
+        }
+    }
+    
+    //need to extend both database and petascopedb
+    /**
+     * Given the list of coverageIds this method deletes them from the database
+     * @param coverageIds
+     * @param commit
+     * @throws PetascopeException 
+     */
+    
+    public void deleteCollectionFromPetascopedb(List<String> coverageIds, boolean commit) throws PetascopeException {
+        for (String coverageName: coverageIds) {
+            if (existsCoverageName(coverageName) == false) {
+            throw new PetascopeException(ExceptionCode.ResourceError,
+                "Cannot delete inexistent coverage: " + coverageName);
+            }
+            Statement s = null;
+            try {
+                s = conn.createStatement();
+                String sqlQuery =
+                    "DELETE FROM " + TABLE_RASDAMAN_COLLECTION +
+                    " WHERE "      + RASDAMAN_COLLECTION_NAME  + "='" + coverageName + "'"
+                    ;
+                log.debug("SQL query : " + sqlQuery);
+                setQuery(sqlQuery);
+                int count = s.executeUpdate(query);
+                log.trace("Affected rows: " + count);
+                s.close();
+
+                if (commit) {
+                    commitAndClose();
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    s.close();
+                } catch (Exception e) {
+                }
+            }
+        } 
+    }
+    
+    public void deleteCollectionFromRasCollection(List<String> coverageIds, boolean commit) throws PetascopeException {
+        for (String coverageName: coverageIds) {
+            if (existsCoverageName(coverageName) == false) {
+            throw new PetascopeException(ExceptionCode.ResourceError,
+                "Cannot delete inexistent coverage: " + coverageName);
+            }
+            Statement s = null;
+            try {
+                s = conn.createStatement();
+                String sqlQuery =
+                    "DELETE FROM " + TABLE_COVERAGE +
+                    " WHERE "      + COVERAGE_NAME  + "='" + coverageName + "'"
+                    ;
+                log.debug("SQL query : " + sqlQuery);
+                setQuery(sqlQuery);
+                int count = s.executeUpdate(query);
+                log.trace("Affected rows: " + count);
+                s.close();
+
+                if (commit) {
+                    commitAndClose();
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    s.close();
+                } catch (Exception e) {
+                }
+            }
+        } 
+    }
+    
+   public void deleteCollectionFromRasdaman(List<String> coverageIds, boolean commit) throws PetascopeException, IOException, RasdamanException {
+        boolean writeFlag = true;
+        for (String coverageName: coverageIds) {
+            if (existsCoverageName(coverageName) == false) {
+            throw new PetascopeException(ExceptionCode.ResourceError,
+                "Cannot delete inexistent coverage: " + coverageName);
+            }
+            
+            String rasQuery = 
+                RASQL_DROP + " " + RASQL_COLLECTION + " " + coverageName
+                ;
+            log.debug("RasQl Query : " + rasQuery);
+            try {
+                RasUtil.executeRasqlQuery(rasQuery, user, pass, writeFlag);
+            } catch (RasdamanException ex) {
+                throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+            }     
+        }
+    }
+    
+    public void deleteCoverage(List<String> coverageIds, boolean commit) throws PetascopeException, RasdamanException {
+        try {
+            deleteCollectionFromPetascopedb(coverageIds, commit);
+            deleteCollectionFromRasCollection(coverageIds, commit);
+            deleteCollectionFromRasdaman(coverageIds, commit);
+        } catch (IOException ex) {
+            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }   
+    
+    //***************************************************************
+    //*********** general coverage information (name, type, ....) ***
+    //***************************************************************
+    
+    /**
+     * returns the gml subtype id given the gml subtype
+     * @param gmlSubType            the gml subtype
+     * @return                      
+     * @throws PetascopeException 
+     */
+    public int getGmlSubtypeId(String gmlSubType) throws PetascopeException {
+        int gmlSubTypeId = 0;
+        Statement s = null;
+        try {
+            s = conn.createStatement();
+            String sqlQuery =
+                    "SELECT id FROM " + TABLE_GML_SUBTYPE +
+                    " WHERE " + GML_SUBTYPE_SUBTYPE + " = " + "'" + gmlSubType + "'"
+                    ;
+            log.debug("SQL Query : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+            while (r.next()) {
+                gmlSubTypeId = r.getInt("id");
+            }
+            log.trace("gml_subtype_id for " + gmlSubType + " : " + gmlSubTypeId);
+        } catch (SQLException sqle) {
+            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, sqle);
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+        throw new PetascopeException(ExceptionCode.InvalidRequest,
+            "Metadata database error", sqle);
+        }     
+        return gmlSubTypeId;
+    }
+    
+    /**
+     * returns the mime type id
+     * @param mimeType          given mime type
+     * @return
+     * @throws PetascopeException 
+     */
+    public int getMimeTypeId(String mimeType) throws PetascopeException{
+        int mimeId = 0;
+        Statement s = null;
+        try {
+            s = conn.createStatement();
+            String sqlQuery = 
+                    "SELECT id FROM " + TABLE_MIME_TYPE + 
+                    " WHERE " + MIME_TYPE_MIME +  " = " + "'" + mimeType + "'"
+                    ;
+            log.debug("SQL Query : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+            while (r.next()) {
+                mimeId = r.getInt("id");
+            }
+            log.trace("mime type id : " + mimeId);
+            } catch (SQLException sqle) {
+                java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, sqle);
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+            throw new PetascopeException(ExceptionCode.InvalidRequest,
+                "Metadata database error", sqle);
+        }     
+        return mimeId;
+    }
+    
+    public void insertGeneralCoverageInfo(String name, int gmlSubtypeId, int nativeFormatId) throws PetascopeException {
+        Statement s = null;
+        try {
+            s = conn.createStatement();
+            String sqlQuery =
+                    "INSERT INTO " + TABLE_COVERAGE + " (" + COVERAGE_NAME + ", " + COVERAGE_GML_TYPE_ID + ", " + COVERAGE_NATIVE_FORMAT_ID + ") " +
+                    "VALUES " + " (" + name+ ", " + gmlSubtypeId + ", " + nativeFormatId + ") "
+                    ;
+            log.debug("sqlQuery for inserting gereral coverage info : " + sqlQuery);
+            setQuery(sqlQuery);
+            s.executeQuery(query);
+        } catch (SQLException sqle) {
+            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, sqle);
+            try {
+                if (s != null) {
+                    s.close();
+            }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+        throw new PetascopeException(ExceptionCode.InvalidRequest,
+            "Metadata database error", sqle);
+        }              
+     }
+    
+    
+    /**
+     * Get Oid of a specified coverage from rasdaman
+     * @param collName      The name of the collection
+     * @return              The Oid of the collection
+     * @throws PetascopeException 
+     */
+    public BigInteger getCollOid(String collName) throws PetascopeException {
+        Object obj = null;
+        String rasQuery =
+            RASQL_SELECT + " " + RASQL_OID + "(c)" +
+            RASQL_FROM   + " " + collName + " " + RASQL_AS + " c " 
+            ;
+        
+        log.debug("RasQL Query : " + rasQuery);
+        try {
+            obj = RasUtil.executeRasqlQuery(rasQuery);
+        } catch (RasdamanException ex) {
+            throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+        }
+        BigInteger oid = null;
+        String result;
+        if (obj != null) {
+            RasQueryResult res = new RasQueryResult(obj);
+            if (!res.getScalars().isEmpty()) {
+                result = res.getScalars().get(0);
+            } else {
+                log.error("Oid of collection " + collName + " was not found.");
+                throw new PetascopeException(ExceptionCode.InvalidCoverageConfiguration,
+                    "Oid of collection " + collName + " was not found: does not exist in " + TABLE_RASDAMAN_COLLECTION);
+            }
+        } else {
+            log.error("Empty response from rasdaman.");
+            throw new PetascopeException(ExceptionCode.RasdamanError, "Empty response from rasdaman.");
+        }
+        String oidstr = (result.replaceFirst(".*?(\\d+).*", "$1"));
+        oid = BigInteger.valueOf(Integer.parseInt(oidstr));
+        log.debug("Oid = " + oid);
+        return oid;
+    }
+    
+    /**
+     * Returns the coverage id of the specified coverage from ps_coverage
+     * @param name          name of the coverage
+     * @return              id of the coverage
+     * @throws PetascopeException 
+     */
+    public int getCoverageId(String name) throws PetascopeException {
+        int id = 0;
+        Statement s = null;
+        try {
+            ensureConnection();
+            s = conn.createStatement();
+            String sqlQuery = 
+                "SELECT " + COVERAGE_ID +
+                " FROM " + TABLE_COVERAGE + 
+                " WHERE " + COVERAGE_NAME + " = " + "'"+name + "'"
+                ;
+            log.debug("SQLQuery : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+            
+            while (r.next()) {
+                id = r.getInt("id");    
+            }
+            log.debug("id = " + id);
+        } catch (SQLException sqle) {
+            /* Abort this transaction */
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+            throw new PetascopeException(ExceptionCode.InvalidRequest,
+                    "Metadata database error", sqle);
+            }               
+        return id;
+    }
+    
+    public int getRasCollId(String name) throws PetascopeException {
+        int id = 0;
+        Statement s = null;
+        try {
+            ensureConnection();
+            s = conn.createStatement();
+            String sqlQuery = 
+                "SELECT " + COVERAGE_ID +
+                " FROM " + TABLE_RASDAMAN_COLLECTION + 
+                " WHERE " + COVERAGE_NAME + " = " + "'"+name + "'"
+                ;
+            log.debug("SQLQuery : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+            
+            while (r.next()) {
+                id = r.getInt("id");    
+            }
+            log.debug("id = " + id);
+        } catch (SQLException sqle) {
+            /* Abort this transaction */
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+            throw new PetascopeException(ExceptionCode.InvalidRequest,
+                    "Metadata database error", sqle);
+            }               
+        return id;
+    }
+    
+    public void insertIntoRasCollection(String name, int oid) throws PetascopeException {
+        Statement s = null;
+        try {
+            s = conn.createStatement();
+            String sqlQuery = 
+                    "INSERT INTO " + TABLE_RASDAMAN_COLLECTION  + " (" + RASDAMAN_COLLECTION_NAME + "," + RASDAMAN_COLLECTION_OID + ") " +
+                    "VALUES " + "(" + name + "," + oid + ")";
+                    ;
+            log.debug("sqlQuery, link Coverage to Rasdaman Collection: " + sqlQuery);
+            setQuery(sqlQuery);
+            s.executeQuery(query);
+        } catch (SQLException ex) {
+            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+        }
+    }
+    
+    public void insertIntoRangeSet (int CovId, int rasCollId) throws PetascopeException {
+        Statement s= null;
+        try {
+            s = conn.createStatement();
+            String sqlQuery =
+                    "INSERT INTO " + TABLE_RANGESET + " (" + COVERAGE_ID + "," + RANGESET_STORAGE_ID + ") " +
+                    "VALUES " + "(" + CovId + "," + rasCollId + ") "
+                    ;
+        } catch (SQLException ex) {
+            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+        }
+    }
+    
+    //********************************************************************
+    //********* describe the datatype of the coverage cell values ********
+    //********************************************************************
+    //TO-DO
+    
+    //********************************************************************
+    //********* create the range type component associated to this quantity ********
+    //********************************************************************
+    
+    /**
+     * 
+     * @param rangeType
+     * @return
+     * @throws PetascopeException 
+     */
+    public int getRangeDataTypeId(String rangeType) throws PetascopeException {
+        int id = 0;
+        Statement s = null;
+        try {
+            ensureConnection();
+            s = conn.createStatement();
+            String sqlQuery = 
+                "SELECT " + RANGE_DATATYPE_ID +
+                " FROM " + TABLE_RANGE_DATATYPE + 
+                " WHERE " + RANGE_DATATYPE_NAME + " = " + "'"+ rangeType + "'"
+                ;
+            log.debug("SQLQuery : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+            
+            while (r.next()) {
+                id = r.getInt("id");    
+            }
+            log.debug("range data type id = " + id);
+        } catch (SQLException sqle) {
+            /* Abort this transaction */
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+            throw new PetascopeException(ExceptionCode.InvalidRequest,
+                    "Metadata database error", sqle);
+            }               
+        return id;
+    }
+    
+    /**
+     * returns the quantity id for the given rangetype quantity label
+     * @param rangeType
+     * @return
+     * @throws PetascopeException 
+     */
+    public int getQuantityId(String rangeType) throws PetascopeException {
+        int id = 0;
+        Statement s = null;
+        try {
+            ensureConnection();
+            s = conn.createStatement();
+            String sqlQuery = 
+                "SELECT " + QUANTITY_ID +
+                " FROM " + TABLE_QUANTITY + 
+                " WHERE " + QUANTITY_LABEL + " = " + "'"+ rangeType + "'" + " AND " + QUANTITY_DESCRIPTION + "=" + "'" + "primitive" + "'" + 
+                " LIMIT 1"               
+                ;
+            log.debug("SQLQuery : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+            
+            while (r.next()) {
+                id = r.getInt("id");    
+            }
+            log.debug("range data type id = " + id);
+        } catch (SQLException sqle) {
+            /* Abort this transaction */
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+            throw new PetascopeException(ExceptionCode.InvalidRequest,
+                    "Metadata database error", sqle);
+            }               
+        return id;
+    }
+    
+    /**
+     * describe the datatype of the coverage cell values (range type)
+     * @param c_id              rangetype component id
+     * @param name              rangetype component name
+     * @param componentOrder    rangetype component order
+     * @param data_type_id      rangetype component data type id
+     * @param field_id          rangetype field id
+     * @throws PetascopeException 
+     */
+    public void insertIntoRangeTypeComponent (int c_id, String name, int componentOrder, int data_type_id, int field_id) throws PetascopeException {
+        Statement s= null;
+        try {
+            s = conn.createStatement();
+            String sqlQuery =
+                    "INSERT INTO " + TABLE_RANGETYPE_COMPONENT + " (" + RANGETYPE_COMPONENT_COVERAGE_ID + "," + RANGETYPE_COMPONENT_NAME + "," + RANGETYPE_COMPONENT_ORDER + "," + RANGETYPE_COMPONENT_TYPE_ID + "," + RANGETYPE_COMPONENT_FIELD_ID + ") " +
+                    "VALUES " + "(" + c_id + "," + name + "," + componentOrder + "," + data_type_id + "," + field_id  + ") "
+                    ;
+            log.debug("SQLQuery : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+        } catch (SQLException ex) {
+            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * inserts the crs uri into table ps_crs if the uri doesnt exist
+     * @param uri
+     * @throws PetascopeException 
+     */
+    public void insertIntoCrsUri (String uri) throws PetascopeException {
+        Statement s= null;
+        try {
+            s = conn.createStatement();
+            String sqlQuery =
+                    "INSERT INTO " + TABLE_CRS + " (" + CRS_URI + ") " +
+                    "SELECT " + "'" + uri + "'" + " WHERE NOT EXISTS " + 
+                    "(SELECT 1 FROM " + TABLE_CRS + " WHERE " + CRS_URI + "=" + "'" + uri + "'" + ")"
+                    ;
+            log.debug("SQLQuery : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+        } catch (SQLException ex) {
+            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+        }
+    }
+    
+    //*********************************************************************
+    //************************ Describe the geo domain*********************
+    //*********************************************************************
+    
+    /**
+     * returns the crs id related to the given crs name 
+     * @param crsName
+     * @return
+     * @throws PetascopeException 
+     */
+    public int getCrsId(String crsName) throws PetascopeException {
+        int id = 0;
+        Statement s = null;
+        try {
+            ensureConnection();
+            s = conn.createStatement();
+            String sqlQuery = 
+                "SELECT " + CRS_ID +
+                " FROM " + TABLE_CRS + 
+                " WHERE " + CRS_URI + " = " + "'"+crsName + "'"
+                ;
+            log.debug("SQLQuery : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+            
+            while (r.next()) {
+                id = r.getInt("id");    
+            }
+            log.debug("crs id = " + id);
+        } catch (SQLException sqle) {
+            /* Abort this transaction */
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+            throw new PetascopeException(ExceptionCode.InvalidRequest,
+                    "Metadata database error", sqle);
+            }               
+        return id;
+    }
+    
+    /**
+     * insert coverage id and respective crs ids into domain set
+     * @param coverage_id
+     * @param native_crs_ids 
+     */
+    public void insertIntoDomainSet(int coverage_id, List<Integer> native_crs_ids) {
+        Statement s= null;
+        try {
+            s = conn.createStatement();
+            //for more than two native crs, run this in a loop.            
+            String sqlQuery =
+                    "INSERT INTO " + TABLE_DOMAINSET + " (" + DOMAINSET_COVERAGE_ID + "," + DOMAINSET_NATIVE_CRS_IDS + ") " +
+                    "VALUES " + "(" + coverage_id + "," + "ARRAY[" + native_crs_ids.get(0) + "," + native_crs_ids.get(1) + "]" + ")"
+                    ;
+            log.debug("SQLQuery : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+        } catch (SQLException ex) {
+            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * insert coverage id and origin into domain set
+     * @param coverage_id
+     * @param origin_t
+     * @param origin_x
+     * @param origin_y 
+     */
+    public void insertIntoGriddedDomainSet(int coverage_id, double origin_t, double origin_x, double origin_y) {
+        Statement s= null;
+        try {
+            s = conn.createStatement();
+            //for more than two native crs, run this in a loop.            
+            String sqlQuery =
+                    "INSERT INTO " + TABLE_GRIDDED_DOMAINSET + " (" + GRIDDED_DOMAINSET_COVERAGE_ID + "," + GRIDDED_DOMAINSET_ORIGIN + ") " +
+                    "VALUES " + "(" + coverage_id + "," + "'" + "{" + origin_t + "," + origin_x + "," + origin_y + "}" + "'" + ")"
+                    ;
+            log.debug("SQLQuery : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+        } catch (SQLException ex) {
+            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * insert coverage id and origin into gridded domain set
+     * @param coverage_id
+     * @param origin_x
+     * @param origin_y 
+     */
+    public void insertIntoGriddedDomainSet(int coverage_id, double origin_x, double origin_y) {
+        Statement s= null;
+        try {
+            s = conn.createStatement();
+            //for more than two native crs, run this in a loop.            
+            String sqlQuery =
+                    "INSERT INTO " + TABLE_GRIDDED_DOMAINSET + " (" + GRIDDED_DOMAINSET_COVERAGE_ID + "," + GRIDDED_DOMAINSET_ORIGIN + ") " +
+                    "VALUES " + "(" + coverage_id + "," + "'" + "{" + origin_x + "," + origin_y + "}" + "'" + ")"
+                    ;
+            log.debug("SQLQuery : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+        } catch (SQLException ex) {
+            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+        }
+    }
+    
+    //**********************************************************************
+    //**************** grid axes *******************************************
+    //**********************************************************************
+    
+    /**
+     * grid axes
+     * @param gridded_coverage_id
+     * @param rasdaman_order 
+     */
+    public void insertIntoGridAxis(int gridded_coverage_id, int rasdaman_order) {
+        Statement s= null;
+        try {
+            s = conn.createStatement();
+            //for more than two native crs, run this in a loop.            
+            String sqlQuery =
+                    "INSERT INTO " + TABLE_GRID_AXIS + " (" + GRID_AXIS_COVERAGE_ID + "," + GRID_AXIS_RASDAMAN_ORDER + ") " +
+                    "VALUES " + "(" + gridded_coverage_id + "," + rasdaman_order + "}" + "'" + ")"
+                    ;
+            log.debug("SQLQuery : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+        } catch (SQLException ex) {
+            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+        }
+    }
+    
+    //*************************************************************************************************
+    //********************************* offset vectors *****************************
+    //**********************************************************************************
+    
+    /**
+     * return grid axis id of the given rasdaman order
+     * @param gridded_coverage_id
+     * @param rasdaman_order
+     * @return
+     * @throws PetascopeException 
+     */
+    public int getGridAxisId(int gridded_coverage_id, int rasdaman_order) throws PetascopeException {
+        int id = 0;
+        Statement s = null;
+        try {
+            ensureConnection();
+            s = conn.createStatement();
+            String sqlQuery = 
+                "SELECT " + GRID_AXIS_ID +
+                " FROM " + TABLE_GRID_AXIS + 
+                " WHERE " + GRID_AXIS_COVERAGE_ID + " = " + "'"+ gridded_coverage_id + "'" + " AND " + GRID_AXIS_RASDAMAN_ORDER + "=" + "'" + rasdaman_order + "'"
+                ;
+            log.debug("SQLQuery : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+            
+            while (r.next()) {
+                id = r.getInt("id");    
+            }
+            log.debug("crs id = " + id);
+        } catch (SQLException sqle) {
+            /* Abort this transaction */
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+            throw new PetascopeException(ExceptionCode.InvalidRequest,
+                    "Metadata database error", sqle);
+            }               
+        return id;
+    }
+    
+    //WGS84 has lat first
+    /**
+     * inserting offset vectors
+     * @param grid_axis_id          
+     * @param offset
+     * @param rasdaman_order 
+     */
+    public void insertIntoRectilinearAxis(int grid_axis_id, double offset, int rasdaman_order) {
+        Statement s= null;
+        try {
+            String sqlQuery = "";
+            s = conn.createStatement();
+            if (rasdaman_order == 0) {
+                sqlQuery =
+                    "INSERT INTO " + TABLE_RECTILINEAR_AXIS + " (" + RECTILINEAR_AXIS_ID + "," + RECTILINEAR_AXIS_OFFSET_VECTOR + ") " +
+                    "VALUES " + "(" + grid_axis_id + "," + "{" + offset + "," + "0" + "," + "0"+ "}" + "'" + ")"
+                    ;
+            } else if (rasdaman_order == 1) {
+                sqlQuery =
+                    "INSERT INTO " + TABLE_RECTILINEAR_AXIS + " (" + RECTILINEAR_AXIS_ID + "," + RECTILINEAR_AXIS_OFFSET_VECTOR + ") " +
+                    "VALUES " + "(" + grid_axis_id + "," + "{" + "0" + "," + offset + "," + "0"+ "}" + "'" + ")"
+                    ;
+            } else if (rasdaman_order == 2) {
+                sqlQuery =
+                    "INSERT INTO " + TABLE_RECTILINEAR_AXIS + " (" + RECTILINEAR_AXIS_ID + "," + RECTILINEAR_AXIS_OFFSET_VECTOR + ") " +
+                    "VALUES " + "(" + grid_axis_id + "," + "{" + "0" + "," + "0" + "," + offset + "}" + "'" + ")"
+                    ;
+            }
+            log.debug("SQLQuery : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+        } catch (SQLException ex) {
+            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+        }
+    }
+    
+    //**************************************************************
+    //******************* Add GMLCOV and OWS extra metadata*********
+    //**************************************************************
+    
+    /**
+     * returns extra metadata type id
+     * @param type      type of the extra meta data eg. ows , gmlcov
+     * @return
+     * @throws PetascopeException 
+     */
+    public int getExtraMetadataTypeId(String type) throws PetascopeException {
+        int id = 0;
+        Statement s = null;
+        try {
+            ensureConnection();
+            s = conn.createStatement();
+            String sqlQuery = 
+                "SELECT " + EXTRAMETADATA_TYPE_ID +
+                " FROM " + TABLE_EXTRAMETADATA_TYPE + 
+                " WHERE " + EXTRAMETADATA_TYPE_TYPE + " = " + "'"+ type + "'" 
+                ;
+            log.debug("SQLQuery : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+            
+            while (r.next()) {
+                id = r.getInt("id");    
+            }
+            log.debug("crs id = " + id);
+        } catch (SQLException sqle) {
+            /* Abort this transaction */
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+            throw new PetascopeException(ExceptionCode.InvalidRequest,
+                    "Metadata database error", sqle);
+            }               
+        return id;
+    }
+    
+    /**
+     * inserts into ps_extra_metadata
+     * @param extraMetadata_id          metadata id
+     * @param metadata_type_id          extra metadata type id
+     * @param value                     extra metadata value eg. <test><ows/test>
+     */
+    public void insertIntoExtraMetadata(int extraMetadata_id, int metadata_type_id, String value) {
+        Statement s= null;
+        try {
+            s = conn.createStatement();
+            String sqlQuery =
+                    "INSERT INTO " + TABLE_EXTRAMETADATA + " (" + EXTRAMETADATA_COVERAGE_ID + "," + EXTRAMETADATA_VALUE + ") " +
+                    "VALUES " + "(" + extraMetadata_id + "," + metadata_type_id + "," + "'" + value + "'" + ")"
+                    ;
+            log.debug("SQLQuery : " + sqlQuery);
+            setQuery(sqlQuery);
+            ResultSet r = s.executeQuery(query);
+        } catch (SQLException ex) {
+            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
+            try {
+                if (s != null) {
+                    s.close();
+                }
+                abortAndClose();
+            } catch (SQLException f) {
+                log.warn(f.getMessage());
+            }
+        }
     }
 }

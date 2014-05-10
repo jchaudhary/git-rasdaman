@@ -452,26 +452,90 @@ public class StringUtil {
         return sdom;
     }
     
-    public static String bufferedToString(BufferedReader rd, int sizei, int sizej) {
+    public static String bufferedToString(BufferedReader rd, int sizei) {
         String result = "";
         List<Integer> indices = new ArrayList<Integer>();
         String temp = "";
+        //String temp = "1,2,3,2,3,4,3,4,5,4,5,6,5,6,7,1,2,3,2,3,4,3,4,5,4,5,6,5,6,7";
         try {  
             temp = rd.readLine();
+            rd.close();
             indices = returnIndices(temp, sizei);
         } catch (IOException ex) {
             Logger.getLogger(StringUtil.class.getName()).log(Level.SEVERE, null, ex);
         }
         System.out.println(indices);
-        result = temp.substring(0, indices.get(0));
-        for (int i = 1; i < sizej; i++) {
+        
+        for (int i = 0; i < indices.size(); i++) {
             System.out.println("iteration :" + i);
-            if (i == indices.size()) {
+            if (i == 0) {
+                result = temp.substring(0, indices.get(0));
+            }
+            else if (i == indices.size()-1) {
                 result += ";"+temp.substring(indices.get(i-1)+1);
             } else {
                 result += ";"+temp.substring(indices.get(i-1)+1, indices.get(i));
             }
         }
+        return result;
+    }
+    
+    public static String tempStringToString(String rd, int sizei) {
+        String result = "";
+        List<Integer> indices = new ArrayList<Integer>();
+        indices = returnIndices(rd, sizei);
+        System.out.println(indices);
+        
+        for (int i = 0; i < indices.size()+1; i++) {
+            if (i == 0) {
+                result = rd.substring(0, indices.get(0));
+            }
+            else if (i == indices.size()) {
+                result += ";"+rd.substring(indices.get(i-1)+1);
+            } else {
+                result += ";"+rd.substring(indices.get(i-1)+1, indices.get(i));
+            }
+        }
+        return result;
+    }
+    
+    public static String structStringBuilder(String data, int size) {
+        List<Integer> indices =  returnIndices(data, size);
+        System.out.println(indices);
+        String tempData = "";
+        for (int i=0; i < indices.size()+1; i++) {
+            if (i == 0) {
+                tempData = data.substring(0, indices.get(0));
+            }
+            else if (i == indices.size()) {
+                tempData += ";"+data.substring(indices.get(i-1)+1);
+            } else {
+                tempData += ";"+data.substring(indices.get(i-1)+1, indices.get(i));
+            }
+        }
+  
+        String result = "";
+        StringTokenizer semicolon = new StringTokenizer(tempData, ";");
+        while(semicolon.hasMoreElements()) {
+            String temp = semicolon.nextToken();
+            StringTokenizer comma = new StringTokenizer(temp, ",");
+            while (comma.hasMoreElements()) {
+                result += "struct{";
+                String buffer = comma.nextToken();
+                StringTokenizer space = new StringTokenizer(buffer);
+                while (space.hasMoreElements()) {
+                    String inbuffer = space.nextToken();
+                    result += inbuffer;
+                    result += ",";
+                }
+                result = result.substring(0, result.length()-1);
+                result += "}"+ ",";
+                
+            }
+            result = result.substring(0, result.length()-1);
+            result += ";";
+        }
+        result = result.substring(0, result.length()-1);
         return result;
     }
 }

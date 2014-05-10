@@ -60,7 +60,7 @@ public class DeleteCoverageHandler extends AbstractRequestHandler<DeleteCoverage
         try {
             List<String> CoverageIds = request.getCoverageIds();
             
-            meta.delete(CoverageIds, true);
+            meta.deleteCoverage(CoverageIds, true);
             
             return new Response(null, serialize(ret), FormatExtension.MIME_XML);
         } catch (IOException ex) {
