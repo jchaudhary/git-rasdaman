@@ -5,9 +5,7 @@
         <group>
             <file>file:/home/rasdaman/install/rasdaman/applications/petascope/src/main/java/petascope/core/DbMetadataSource.java</file>
             <file>file:/home/rasdaman/install/rasdaman/applications/petascope/src/main/java/petascope/wcsTransaction/handlers/InsertCoverageHandler.java</file>
-            <file>file:/home/rasdaman/install/rasdaman/applications/petascope/src/main/java/petascope/util/XMLUtil.java</file>
             <file>file:/home/rasdaman/install/rasdaman/applications/petascope/src/main/java/petascope/wcs2/extensions/KVPProtocolExtension.java</file>
-            <file>file:/home/rasdaman/install/rasdaman/applications/petascope/src/main/java/petascope/PetascopeInterface.java</file>
             <file>file:/home/rasdaman/install/rasdaman/applications/petascope/src/main/java/petascope/wcsTransaction/parsers/KVPInsertCoverageParser.java</file>
         </group>
     </open-files>

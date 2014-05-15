@@ -2303,7 +2303,6 @@ public class DbMetadataSource implements IMetadataSource {
                 setQuery(sqlQuery);
                 int count = s.executeUpdate(query);
                 log.trace("Affected rows: " + count);
-                s.close();
 
                 if (commit) {
                     commitAndClose();
@@ -2336,8 +2335,7 @@ public class DbMetadataSource implements IMetadataSource {
                 setQuery(sqlQuery);
                 int count = s.executeUpdate(query);
                 log.trace("Affected rows: " + count);
-                s.close();
-
+                
                 if (commit) {
                     commitAndClose();
                 }
@@ -2354,6 +2352,8 @@ public class DbMetadataSource implements IMetadataSource {
     
    public void deleteCollectionFromRasdaman(List<String> coverageIds, boolean commit) throws PetascopeException, IOException, RasdamanException {
         boolean writeFlag = true;
+        String user = "rasadmin";
+        String pass = "rasadmin";
         for (String coverageName: coverageIds) {
             if (existsCoverageName(coverageName) == false) {
             throw new PetascopeException(ExceptionCode.ResourceError,
@@ -2366,6 +2366,7 @@ public class DbMetadataSource implements IMetadataSource {
             log.debug("RasQl Query : " + rasQuery);
             try {
                 RasUtil.executeRasqlQuery(rasQuery, user, pass, writeFlag);
+                log.debug("dropping from rasdaman: " + coverageName);
             } catch (RasdamanException ex) {
                 throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
             }     
@@ -2374,9 +2375,10 @@ public class DbMetadataSource implements IMetadataSource {
     
     public void deleteCoverage(List<String> coverageIds, boolean commit) throws PetascopeException, RasdamanException {
         try {
+            deleteCollectionFromRasdaman(coverageIds, commit);
             deleteCollectionFromPetascopeDb(coverageIds, commit);
             //deleteCollectionFromRasCollection(coverageIds, commit);
-            deleteCollectionFromRasdaman(coverageIds, commit);
+            
         } catch (IOException ex) {
             java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -3202,7 +3204,6 @@ public class DbMetadataSource implements IMetadataSource {
         try {
             s = conn.createStatement();
             String sqlQuery =
-                     sqlQuery =
                     "INSERT INTO " + TABLE_GRIDDED_DOMAINSET + " (" + GRIDDED_DOMAINSET_COVERAGE_ID + "," + GRIDDED_DOMAINSET_ORIGIN + ") " +
                     "VALUES " + "(" + coverage_id + "," + "'" + "{" + origin_x + "," + origin_y + "}" + "'" + ")"
                     ;
@@ -3243,8 +3244,7 @@ public class DbMetadataSource implements IMetadataSource {
             setQuery(sqlQuery);
             int count = s.executeUpdate(query);
             log.trace("general coverage info for: " + count);
-            s.close();
-
+            
             if (commit) {
                 commitAndClose();
             }
@@ -3319,20 +3319,19 @@ public class DbMetadataSource implements IMetadataSource {
             if (rasdaman_order == 0) {
                 sqlQuery =
                     "INSERT INTO " + TABLE_RECTILINEAR_AXIS + " (" + RECTILINEAR_AXIS_ID + "," + RECTILINEAR_AXIS_OFFSET_VECTOR + ") " +
-                    "VALUES " + "(" + grid_axis_id + "," + "{" + offset + "," + "0"+ "}" + "'" + ")"
+                    "VALUES " + "(" + grid_axis_id + "," + "'" +  "{" + offset + "," + "0"+ "}" + "'" + ")"
                     ;
             } else if (rasdaman_order == 1) {
                 sqlQuery =
                     "INSERT INTO " + TABLE_RECTILINEAR_AXIS + " (" + RECTILINEAR_AXIS_ID + "," + RECTILINEAR_AXIS_OFFSET_VECTOR + ") " +
-                    "VALUES " + "(" + grid_axis_id + "," + "{" + "0" + "," + offset + "}" + "'" + ")"
+                    "VALUES " + "(" + grid_axis_id + "," + "'" + "{" + "0" + "," + offset + "}" + "'" + ")"
                     ;
             }
             log.debug("SQL query : " + sqlQuery);
             setQuery(sqlQuery);
             int count = s.executeUpdate(query);
             log.trace("general coverage info for: " + count);
-            s.close();
-
+            
             if (commit) {
                 commitAndClose();
             }
@@ -3402,7 +3401,7 @@ public class DbMetadataSource implements IMetadataSource {
         try {
             s = conn.createStatement();
             String sqlQuery =
-                    "INSERT INTO " + TABLE_EXTRAMETADATA + " (" + EXTRAMETADATA_COVERAGE_ID + "," + EXTRAMETADATA_VALUE + ") " +
+                    "INSERT INTO " + TABLE_EXTRAMETADATA + " (" + EXTRAMETADATA_COVERAGE_ID + "," + EXTRAMETADATA_METADATA_TYPE_ID + "," + EXTRAMETADATA_VALUE + ") " +
                     "VALUES " + "(" + extraMetadata_id + "," + metadata_type_id + "," + "'" + value + "'" + ")"
                     ;
             log.debug("SQL query : " + sqlQuery);

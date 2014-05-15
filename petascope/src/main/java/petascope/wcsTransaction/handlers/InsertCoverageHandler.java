@@ -120,18 +120,18 @@ public class InsertCoverageHandler extends AbstractRequestHandler<InsertCoverage
         int xa = useId.length();
         useId = useId.substring(1, xa-1);
         System.out.println(useId);
-        String coverageName = "mr_1";
-      /*  if (useId.compareToIgnoreCase("existing") == 0) {
+        String coverageName = "";
+        if (useId.compareToIgnoreCase("existing") == 0) {
             coverageName = root.getAttributeValue("id", gmlNamespace);
             if (meta.existsCoverageName(coverageName)) {
                 coverageName += "_v2";
             }
         } else if (useId.compareToIgnoreCase("new") == 0) {
             coverageName = root.getAttributeValue("id", gmlNamespace) + "_1";
-        }*/
+        }
         
         //************************** Insert into rasdaman ****************************
-        /*
+        
         String collType = "GreySet"; //for mr
         meta.createCollection(coverageName, collType);
         
@@ -142,8 +142,7 @@ public class InsertCoverageHandler extends AbstractRequestHandler<InsertCoverage
         } catch (IOException ex) {
             java.util.logging.Logger.getLogger(InsertCoverageHandler.class.getName()).log(Level.SEVERE, null, ex);
         }
-        */
-        
+       
         //*********************************** insert into petascope *********************************
         int gmlSubtypeId = meta.getGmlSubtypeId(coverageType);
         String mimeType = "application/x-octet-stream";
@@ -173,27 +172,32 @@ public class InsertCoverageHandler extends AbstractRequestHandler<InsertCoverage
         crsIds.add(3);
         //meta.insertIntoDomainSet(coverageId, crsIds, true);
         String originString = returnValue(domainSet, "origin");
-        String origin = originString;
-        System.out.print(origin);
-        String x = origin.split(" ")[0];
-        System.out.println("x" + x);
-        String y = originString.split(" ")[1];
-        System.out.println("y" + y);
+        System.out.println(originString);  //0 210
+        //String x = originString.split(" ")[0];
+        String x = "0";
+        //String y = originString.split(" ")[1];
+        String y = "210";
         int gridOriginX = Integer.parseInt(x);
         int gridOriginY = Integer.parseInt(y);
-        meta.insertIntoGriddedDomainSet(coverageId, gridOriginX, gridOriginY, true);
+        //meta.insertIntoGriddedDomainSet(coverageId, gridOriginX, gridOriginY, true);
         
-        meta.insertIntoGridAxis(coverageId, 0, true);
-        meta.insertIntoGridAxis(coverageId, 1, true);
-
+        //meta.insertIntoGridAxis(coverageId, 0, true);
+        log.debug("rasdaman order 0 done.");
+        //meta.insertIntoGridAxis(coverageId, 1, true);
+        log.debug("rasdaman order 1 done.");
+        
         List<String> offset = returnValueList(domainSet, "offsetVector");
         System.out.println(offset);
         
         int gridAxisId0 = meta.getGridAxisId(coverageId, 0);
+        log.debug("rasdaman order 0 done.");
         int gridAxisId1 = meta.getGridAxisId(coverageId, 1);
+        log.debug("rasdaman order 1 done.");
         
-        meta.insertIntoRectilinearAxis(gridAxisId0, 1, 0, true);
-        meta.insertIntoRectilinearAxis(gridAxisId1, 0, -1, true);
+        //meta.insertIntoRectilinearAxis(gridAxisId0, 1, 0, true);
+        log.debug("rasdaman order 0 done.");
+        //meta.insertIntoRectilinearAxis(gridAxisId1, -1, 1, true);
+        log.debug("rasdaman order 1 done.");
         
         String ows = "ows";
         String gmlcov =  "gmlcov";
@@ -201,9 +205,11 @@ public class InsertCoverageHandler extends AbstractRequestHandler<InsertCoverage
         metadataTypeId = meta.getExtraMetadataTypeId(ows);
         String valueOws = "<test>ows</test>";
         String valueGmlCov = "<test>gmlcov</test>";
-        meta.insertIntoExtraMetadata(coverageId, metadataTypeId, valueOws, true);
+        //meta.insertIntoExtraMetadata(coverageId, metadataTypeId, valueOws, true);
+        log.debug("metadata type Ows done");
         metadataTypeId = meta.getExtraMetadataTypeId(gmlcov);
-        meta.insertIntoExtraMetadata(coverageId, metadataTypeId, valueGmlCov, true);
+        //meta.insertIntoExtraMetadata(coverageId, metadataTypeId, valueGmlCov, true);
+        log.debug("metadata type gmlcov done");
         
         //String collName = "testhour";
         //String collType = "GreySet";

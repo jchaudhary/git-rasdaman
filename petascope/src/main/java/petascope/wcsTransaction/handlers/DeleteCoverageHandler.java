@@ -58,9 +58,8 @@ public class DeleteCoverageHandler extends AbstractRequestHandler<DeleteCoverage
     public Response handle(DeleteCoverageRequest request) throws WCSException, PetascopeException  {
        Document ret = constructDocument(LABEL_COVERAGE_DESCRIPTIONS, NAMESPACE_WCS);
         try {
-            List<String> CoverageIds = request.getCoverageIds();
-            
-            meta.deleteCoverage(CoverageIds, true);
+            List<String> coverageIds = request.getCoverageIds();
+            meta.deleteCoverage(coverageIds, true);
             
             return new Response(null, serialize(ret), FormatExtension.MIME_XML);
         } catch (IOException ex) {
