@@ -91,6 +91,7 @@ import petascope.util.ras.RasUtil;
 import petascope.wcps.server.core.*;
 import petascope.wcs2.parsers.BaseRequest;
 import petascope.util.ListUtil;
+import static petascope.util.ListUtil.ltos;
 import static petascope.util.ListUtil.sdomBuilder;
 import static petascope.util.StringUtil.bufferedToString;
 import static petascope.util.StringUtil.structStringBuilder;
@@ -2215,42 +2216,175 @@ public class DbMetadataSource implements IMetadataSource {
     private void write(CoverageMetadata meta, boolean commit) throws PetascopeException {
         String coverageName = meta.getCoverageName();
         if (existsCoverageName(coverageName)) {
-            updateCoverageMetadata(meta, commit);
+            //updateCoverageMetadata(meta, commit);
         } else {
-            insertNewCoverageMetadata(meta, commit);
+            //insertNewCoverageMetadata(meta, commit);
         }        
     }
     
-    public void insertNewCoverageMetadata(CoverageMetadata meta, boolean commit) {
-        int coverageId = meta.getCoverageId();    // Used when reading metadata from the DB
-        List<CellDomainElement> cellDomain = meta.getCellDomainList();
-        List<DomainElement> domain = meta.getDomainList();
-        String coverageName = meta.getCoverageName();
-        String coverageType = meta.getCoverageType();
-        String nativeFormat = meta.getNativeFormat();
-        List<String> crsUris = meta.getCrsUris(); // 1+ single CRS URIs
-        Set<Pair<String,String>> extraMetadata = meta.getExtraMetadata(); // {metadata_type,metadata_value}
-        
-        List<RangeElement> range = null;
-        Iterator<RangeElement> itRangeElement = meta.getRangeIterator();
-        while (itRangeElement.hasNext()) {
-            range.add(itRangeElement.next());
-        }
-        
-        Iterator<AbstractSimpleComponent> itAbstract = meta.getSweComponentsIterator();
-        List<AbstractSimpleComponent> sweComponents = null;
-        while(itAbstract.hasNext()) {
-            sweComponents.add(itAbstract.next());
-        }
-        
-        Pair<BigInteger, String> rasdamanCollection =  meta.getRasdamanCollection();
-        Bbox bbox = meta.getBbox();
-    }
+ 
     
-    //TOO
+    //TOO 
+    /*
     public void updateCoverageMetadata(CoverageMetadata meta, boolean commit) {
         
     }
+    */
+    
+    
+    /**
+     * delete coverage data 
+     * @param meta
+     * @param commit
+     * @throws PetascopeException 
+     */
+    public void delete(CoverageMetadata meta, boolean commit) throws PetascopeException {
+        String coverageName = meta.getCoverageName();
+        if (existsCoverageName(coverageName) == false) {
+            throw new PetascopeException(ExceptionCode.ResourceError,
+                    "Cannot delete inexistent coverage: " + coverageName);
+        }
+
+        /* Delete main coverage entry from "PS_Coverage". Auxiliary metadata are
+         * automatically deleted by the DB (via CASCADING) on
+         * deletion of the main entry in ps_coverage */
+        Statement s = null;
+        try {
+            s = conn.createStatement();
+            String sqlQuery =
+                    "DELETE FROM " + TABLE_COVERAGE +
+                    " WHERE "      + COVERAGE_NAME  + "='" + coverageName + "'"
+                    ;
+            log.debug("SQL query : " + sqlQuery);
+            setQuery(sqlQuery);
+            int count = s.executeUpdate(query);
+            log.trace("Affected rows: " + count);
+            s.close();
+
+            if (commit) {
+                commitAndClose();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                s.close();
+            } catch (Exception e) {
+            }
+        }
+    }
+    
+    //**************************************************************************
+    //**************** Delete Coverage *****************************************
+    //**************************************************************************    
+    
+    //need to extend both database and petascopedb
+    /**
+     * Given the list of coverageIds this method deletes them from the database
+     * @param coverageIds
+     * @param commit
+     * @throws PetascopeException 
+     */
+    
+    public void deleteCollectionFromRasCollection(List<String> coverageIds, boolean commit) throws PetascopeException {
+        for (String coverageName: coverageIds) {
+            if (existsCoverageName(coverageName) == false) {
+            throw new PetascopeException(ExceptionCode.ResourceError,
+                "Cannot delete inexistent coverage: " + coverageName);
+            }
+            Statement s = null;
+            try {
+                s = conn.createStatement();
+                String sqlQuery =
+                    "DELETE FROM " + TABLE_RASDAMAN_COLLECTION +
+                    " WHERE "      + RASDAMAN_COLLECTION_NAME  + "='" + coverageName + "'"
+                    ;
+                log.debug("SQL query : " + sqlQuery);
+                setQuery(sqlQuery);
+                int count = s.executeUpdate(query);
+                log.trace("Affected rows: " + count);
+                s.close();
+
+                if (commit) {
+                    commitAndClose();
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    s.close();
+                } catch (Exception e) {
+                }
+            }
+        } 
+    }
+    
+    public void deleteCollectionFromPetascopeDb(List<String> coverageIds, boolean commit) throws PetascopeException {
+        for (String coverageName: coverageIds) {
+            if (existsCoverageName(coverageName) == false) {
+            throw new PetascopeException(ExceptionCode.ResourceError,
+                "Cannot delete inexistent coverage: " + coverageName);
+            }
+            Statement s = null;
+            try {
+                s = conn.createStatement();
+                String sqlQuery =
+                    "DELETE FROM " + TABLE_COVERAGE +
+                    " WHERE "      + COVERAGE_NAME  + "='" + coverageName + "'"
+                    ;
+                log.debug("SQL query : " + sqlQuery);
+                setQuery(sqlQuery);
+                int count = s.executeUpdate(query);
+                log.trace("Affected rows: " + count);
+                s.close();
+
+                if (commit) {
+                    commitAndClose();
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    s.close();
+                } catch (Exception e) {
+                }
+            }
+        } 
+    }
+    
+   public void deleteCollectionFromRasdaman(List<String> coverageIds, boolean commit) throws PetascopeException, IOException, RasdamanException {
+        boolean writeFlag = true;
+        for (String coverageName: coverageIds) {
+            if (existsCoverageName(coverageName) == false) {
+            throw new PetascopeException(ExceptionCode.ResourceError,
+                "Cannot delete inexistent coverage: " + coverageName);
+            }
+            
+            String rasQuery = 
+                RASQL_DROP + " " + RASQL_COLLECTION + " " + coverageName
+                ;
+            log.debug("RasQl Query : " + rasQuery);
+            try {
+                RasUtil.executeRasqlQuery(rasQuery, user, pass, writeFlag);
+            } catch (RasdamanException ex) {
+                throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
+            }     
+        }
+    }
+    
+    public void deleteCoverage(List<String> coverageIds, boolean commit) throws PetascopeException, RasdamanException {
+        try {
+            deleteCollectionFromPetascopeDb(coverageIds, commit);
+            //deleteCollectionFromRasCollection(coverageIds, commit);
+            deleteCollectionFromRasdaman(coverageIds, commit);
+        } catch (IOException ex) {
+            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+    
+    //**************************************************************************
+    //******************* Insert Coverage **************************************
+    //**************************************************************************
     
     /**
      * creates collection of given name and given type 
@@ -2429,7 +2563,7 @@ public class DbMetadataSource implements IMetadataSource {
      * @throws PetascopeException
      * @throws IOException 
      */
-    public void insertStructCoverage(String collName, Element domainSet, Element rangeSet, String baseType) throws PetascopeException, IOException {
+    public void insertStructCollection(String collName, Element domainSet, Element rangeSet, String baseType) throws PetascopeException, IOException {
         Object obj = null;
         String user = "rasadmin"; 
         String pass = "rasadmin";
@@ -2531,153 +2665,11 @@ public class DbMetadataSource implements IMetadataSource {
                 }
             }           
         }
-    }
-    
-    /**
-     * delete coverage data 
-     * @param meta
-     * @param commit
-     * @throws PetascopeException 
-     */
-    public void delete(CoverageMetadata meta, boolean commit) throws PetascopeException {
-        String coverageName = meta.getCoverageName();
-        if (existsCoverageName(coverageName) == false) {
-            throw new PetascopeException(ExceptionCode.ResourceError,
-                    "Cannot delete inexistent coverage: " + coverageName);
-        }
-
-        /* Delete main coverage entry from "PS_Coverage". Auxiliary metadata are
-         * automatically deleted by the DB (via CASCADING) on
-         * deletion of the main entry in ps_coverage */
-        Statement s = null;
-        try {
-            s = conn.createStatement();
-            String sqlQuery =
-                    "DELETE FROM " + TABLE_COVERAGE +
-                    " WHERE "      + COVERAGE_NAME  + "='" + coverageName + "'"
-                    ;
-            log.debug("SQL query : " + sqlQuery);
-            setQuery(sqlQuery);
-            int count = s.executeUpdate(query);
-            log.trace("Affected rows: " + count);
-            s.close();
-
-            if (commit) {
-                commitAndClose();
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                s.close();
-            } catch (Exception e) {
-            }
-        }
-    }
-    
-    //need to extend both database and petascopedb
-    /**
-     * Given the list of coverageIds this method deletes them from the database
-     * @param coverageIds
-     * @param commit
-     * @throws PetascopeException 
-     */
-    
-    public void deleteCollectionFromPetascopedb(List<String> coverageIds, boolean commit) throws PetascopeException {
-        for (String coverageName: coverageIds) {
-            if (existsCoverageName(coverageName) == false) {
-            throw new PetascopeException(ExceptionCode.ResourceError,
-                "Cannot delete inexistent coverage: " + coverageName);
-            }
-            Statement s = null;
-            try {
-                s = conn.createStatement();
-                String sqlQuery =
-                    "DELETE FROM " + TABLE_RASDAMAN_COLLECTION +
-                    " WHERE "      + RASDAMAN_COLLECTION_NAME  + "='" + coverageName + "'"
-                    ;
-                log.debug("SQL query : " + sqlQuery);
-                setQuery(sqlQuery);
-                int count = s.executeUpdate(query);
-                log.trace("Affected rows: " + count);
-                s.close();
-
-                if (commit) {
-                    commitAndClose();
-                }
-            } catch (SQLException e) {
-                e.printStackTrace();
-            } finally {
-                try {
-                    s.close();
-                } catch (Exception e) {
-                }
-            }
-        } 
-    }
-    
-    public void deleteCollectionFromRasCollection(List<String> coverageIds, boolean commit) throws PetascopeException {
-        for (String coverageName: coverageIds) {
-            if (existsCoverageName(coverageName) == false) {
-            throw new PetascopeException(ExceptionCode.ResourceError,
-                "Cannot delete inexistent coverage: " + coverageName);
-            }
-            Statement s = null;
-            try {
-                s = conn.createStatement();
-                String sqlQuery =
-                    "DELETE FROM " + TABLE_COVERAGE +
-                    " WHERE "      + COVERAGE_NAME  + "='" + coverageName + "'"
-                    ;
-                log.debug("SQL query : " + sqlQuery);
-                setQuery(sqlQuery);
-                int count = s.executeUpdate(query);
-                log.trace("Affected rows: " + count);
-                s.close();
-
-                if (commit) {
-                    commitAndClose();
-                }
-            } catch (SQLException e) {
-                e.printStackTrace();
-            } finally {
-                try {
-                    s.close();
-                } catch (Exception e) {
-                }
-            }
-        } 
-    }
-    
-   public void deleteCollectionFromRasdaman(List<String> coverageIds, boolean commit) throws PetascopeException, IOException, RasdamanException {
-        boolean writeFlag = true;
-        for (String coverageName: coverageIds) {
-            if (existsCoverageName(coverageName) == false) {
-            throw new PetascopeException(ExceptionCode.ResourceError,
-                "Cannot delete inexistent coverage: " + coverageName);
-            }
-            
-            String rasQuery = 
-                RASQL_DROP + " " + RASQL_COLLECTION + " " + coverageName
-                ;
-            log.debug("RasQl Query : " + rasQuery);
-            try {
-                RasUtil.executeRasqlQuery(rasQuery, user, pass, writeFlag);
-            } catch (RasdamanException ex) {
-                throw new PetascopeException(ExceptionCode.InternalComponentError, "Error while executing RasQL query", ex);
-            }     
-        }
-    }
-    
-    public void deleteCoverage(List<String> coverageIds, boolean commit) throws PetascopeException, RasdamanException {
-        try {
-            deleteCollectionFromPetascopedb(coverageIds, commit);
-            deleteCollectionFromRasCollection(coverageIds, commit);
-            deleteCollectionFromRasdaman(coverageIds, commit);
-        } catch (IOException ex) {
-            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
-        }
     }   
+    
+    //**************************************************************************
+    //********************** Insert into PetascopeDb****************************
+    //**************************************************************************
     
     //***************************************************************
     //*********** general coverage information (name, type, ....) ***
@@ -2759,32 +2751,33 @@ public class DbMetadataSource implements IMetadataSource {
         return mimeId;
     }
     
-    public void insertGeneralCoverageInfo(String name, int gmlSubtypeId, int nativeFormatId) throws PetascopeException {
+    public void insertGeneralCoverageInfo(String name, int gmlSubtypeId, int nativeFormatId, boolean commit) throws PetascopeException {
         Statement s = null;
         try {
             s = conn.createStatement();
             String sqlQuery =
-                    "INSERT INTO " + TABLE_COVERAGE + " (" + COVERAGE_NAME + ", " + COVERAGE_GML_TYPE_ID + ", " + COVERAGE_NATIVE_FORMAT_ID + ") " +
-                    "VALUES " + " (" + name+ ", " + gmlSubtypeId + ", " + nativeFormatId + ") "
-                    ;
-            log.debug("sqlQuery for inserting gereral coverage info : " + sqlQuery);
+                "INSERT INTO " + TABLE_COVERAGE + " (" + COVERAGE_NAME + ", " + COVERAGE_GML_TYPE_ID + ", " + COVERAGE_NATIVE_FORMAT_ID + ") " +
+                "VALUES " + " (" + "'" + name + "'" + ", " + gmlSubtypeId + ", " + nativeFormatId + ") "
+                ;
+            log.debug("SQL query : " + sqlQuery);
             setQuery(sqlQuery);
-            s.executeQuery(query);
-        } catch (SQLException sqle) {
-            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, sqle);
+            s.executeUpdate(query);
+      
+            s.close();
+
+            if (commit) {
+                commitAndClose();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
             try {
-                if (s != null) {
-                    s.close();
+                s.close();
+            } catch (Exception e) {
             }
-                abortAndClose();
-            } catch (SQLException f) {
-                log.warn(f.getMessage());
-            }
-        throw new PetascopeException(ExceptionCode.InvalidRequest,
-            "Metadata database error", sqle);
-        }              
+       }
      }
-    
+     
     
     /**
      * Get Oid of a specified coverage from rasdaman
@@ -2902,49 +2895,54 @@ public class DbMetadataSource implements IMetadataSource {
         return id;
     }
     
-    public void insertIntoRasCollection(String name, int oid) throws PetascopeException {
+    public void insertIntoRasCollection(String name, int oid, boolean commit) throws PetascopeException {
         Statement s = null;
         try {
             s = conn.createStatement();
             String sqlQuery = 
                     "INSERT INTO " + TABLE_RASDAMAN_COLLECTION  + " (" + RASDAMAN_COLLECTION_NAME + "," + RASDAMAN_COLLECTION_OID + ") " +
-                    "VALUES " + "(" + name + "," + oid + ")";
-                    ;
-            log.debug("sqlQuery, link Coverage to Rasdaman Collection: " + sqlQuery);
+                    "VALUES " + "(" + "'" + name + "'" + "," + oid + ")"
+                ;
+            log.debug("SQL query : " + sqlQuery);
             setQuery(sqlQuery);
-            s.executeQuery(query);
-        } catch (SQLException ex) {
-            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
-            try {
-                if (s != null) {
-                    s.close();
-                }
-                abortAndClose();
-            } catch (SQLException f) {
-                log.warn(f.getMessage());
+            int count = s.executeUpdate(query);
+            log.trace("general coverage info for: " + count);
+            if (commit) {
+                commitAndClose();
             }
-        }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                s.close();
+            } catch (Exception e) {
+            }
+       }
     }
     
-    public void insertIntoRangeSet (int CovId, int rasCollId) throws PetascopeException {
-        Statement s= null;
+    public void insertIntoRangeSet(int CovId, int rasCollId, boolean commit) throws PetascopeException {
+        Statement s = null;
         try {
             s = conn.createStatement();
             String sqlQuery =
-                    "INSERT INTO " + TABLE_RANGESET + " (" + COVERAGE_ID + "," + RANGESET_STORAGE_ID + ") " +
+                    "INSERT INTO " + TABLE_RANGESET + " (" + RANGESET_COVERAGE_ID + "," + RANGESET_STORAGE_ID + ") " +
                     "VALUES " + "(" + CovId + "," + rasCollId + ") "
                     ;
-        } catch (SQLException ex) {
-            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
-            try {
-                if (s != null) {
-                    s.close();
-                }
-                abortAndClose();
-            } catch (SQLException f) {
-                log.warn(f.getMessage());
+            log.debug("SQL query : " + sqlQuery);
+            setQuery(sqlQuery);
+            int count = s.executeUpdate(query);
+            log.trace("general coverage info for: " + count);
+            if (commit) {
+                commitAndClose();
             }
-        }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                s.close();
+            } catch (Exception e) {
+            }
+       }
     }
     
     //********************************************************************
@@ -3039,46 +3037,37 @@ public class DbMetadataSource implements IMetadataSource {
         return id;
     }
     
-    /**
-     * describe the datatype of the coverage cell values (range type)
-     * @param c_id              rangetype component id
-     * @param name              rangetype component name
-     * @param componentOrder    rangetype component order
-     * @param data_type_id      rangetype component data type id
-     * @param field_id          rangetype field id
-     * @throws PetascopeException 
-     */
-    public void insertIntoRangeTypeComponent (int c_id, String name, int componentOrder, int data_type_id, int field_id) throws PetascopeException {
-        Statement s= null;
+    
+    public void insertIntoRangeTypeComponent (int c_id, String name, int componentOrder, int data_type_id, int field_id, boolean commit) throws PetascopeException {
+        Statement s = null;
         try {
             s = conn.createStatement();
             String sqlQuery =
-                    "INSERT INTO " + TABLE_RANGETYPE_COMPONENT + " (" + RANGETYPE_COMPONENT_COVERAGE_ID + "," + RANGETYPE_COMPONENT_NAME + "," + RANGETYPE_COMPONENT_ORDER + "," + RANGETYPE_COMPONENT_TYPE_ID + "," + RANGETYPE_COMPONENT_FIELD_ID + ") " +
-                    "VALUES " + "(" + c_id + "," + name + "," + componentOrder + "," + data_type_id + "," + field_id  + ") "
+                    "INSERT INTO " + TABLE_RANGETYPE_COMPONENT + " (" + RANGETYPE_COMPONENT_COVERAGE_ID + "," +RANGETYPE_COMPONENT_NAME + "," + RANGETYPE_COMPONENT_ORDER + "," + RANGETYPE_COMPONENT_TYPE_ID + "," + RANGETYPE_COMPONENT_FIELD_ID + ") " +
+                    "VALUES " + "(" + c_id + "," + "'" + name + "'" + "," + componentOrder + "," + data_type_id + "," + field_id  + ") "
                     ;
-            log.debug("SQLQuery : " + sqlQuery);
+            log.debug("SQL query : " + sqlQuery);
             setQuery(sqlQuery);
-            ResultSet r = s.executeQuery(query);
-        } catch (SQLException ex) {
-            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
-            try {
-                if (s != null) {
-                    s.close();
-                }
-                abortAndClose();
-            } catch (SQLException f) {
-                log.warn(f.getMessage());
+            int count = s.executeUpdate(query);
+            log.trace("general coverage info for: " + count);
+            s.close();
+
+            if (commit) {
+                commitAndClose();
             }
-        }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                s.close();
+            } catch (Exception e) {
+            }
+       }
     }
     
-    /**
-     * inserts the crs uri into table ps_crs if the uri doesnt exist
-     * @param uri
-     * @throws PetascopeException 
-     */
-    public void insertIntoCrsUri (String uri) throws PetascopeException {
-        Statement s= null;
+    
+    public void insertIntoCrsUri (String uri, boolean commit) throws PetascopeException {
+        Statement s = null;
         try {
             s = conn.createStatement();
             String sqlQuery =
@@ -3086,20 +3075,23 @@ public class DbMetadataSource implements IMetadataSource {
                     "SELECT " + "'" + uri + "'" + " WHERE NOT EXISTS " + 
                     "(SELECT 1 FROM " + TABLE_CRS + " WHERE " + CRS_URI + "=" + "'" + uri + "'" + ")"
                     ;
-            log.debug("SQLQuery : " + sqlQuery);
+            log.debug("SQL query : " + sqlQuery);
             setQuery(sqlQuery);
-            ResultSet r = s.executeQuery(query);
-        } catch (SQLException ex) {
-            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
-            try {
-                if (s != null) {
-                    s.close();
-                }
-                abortAndClose();
-            } catch (SQLException f) {
-                log.warn(f.getMessage());
+            int count = s.executeUpdate(query);
+            log.trace("general coverage info for: " + count);
+            s.close();
+
+            if (commit) {
+                commitAndClose();
             }
-        }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                s.close();
+            } catch (Exception e) {
+            }
+       }
     }
     
     //*********************************************************************
@@ -3147,36 +3139,32 @@ public class DbMetadataSource implements IMetadataSource {
         return id;
     }
     
-    /**
-     * insert coverage id and respective crs ids into domain set
-     * @param coverage_id
-     * @param native_crs_ids 
-     */
-    public void insertIntoDomainSet(int coverage_id, List<Integer> native_crs_ids) {
-        Statement s= null;
+    public void insertIntoDomainSet(int coverage_id, List<Integer> native_crs_ids, boolean commit) throws PetascopeException {
+        Statement s = null;
         try {
             s = conn.createStatement();
-            //for more than two native crs, run this in a loop.            
             String sqlQuery =
                     "INSERT INTO " + TABLE_DOMAINSET + " (" + DOMAINSET_COVERAGE_ID + "," + DOMAINSET_NATIVE_CRS_IDS + ") " +
-                    "VALUES " + "(" + coverage_id + "," + "ARRAY[" + native_crs_ids.get(0) + "," + native_crs_ids.get(1) + "]" + ")"
+                    "VALUES " + "(" + coverage_id + "," + "ARRAY[" + ltos(native_crs_ids) + "]" + ")"
                     ;
-            log.debug("SQLQuery : " + sqlQuery);
+            log.debug("SQL query : " + sqlQuery);
             setQuery(sqlQuery);
-            ResultSet r = s.executeQuery(query);
-        } catch (SQLException ex) {
-            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
-            try {
-                if (s != null) {
-                    s.close();
-                }
-                abortAndClose();
-            } catch (SQLException f) {
-                log.warn(f.getMessage());
+            int count = s.executeUpdate(query);
+            log.trace("general coverage info for: " + count);
+
+            if (commit) {
+                commitAndClose();
             }
-        }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                s.close();
+            } catch (Exception e) {
+            }
+       }
     }
-    
+      
     /**
      * insert coverage id and origin into domain set
      * @param coverage_id
@@ -3184,7 +3172,7 @@ public class DbMetadataSource implements IMetadataSource {
      * @param origin_x
      * @param origin_y 
      */
-    public void insertIntoGriddedDomainSet(int coverage_id, double origin_t, double origin_x, double origin_y) {
+    public void insertIntoGriddedDomainSet(int coverage_id, int origin_t, int origin_x, double origin_y) {
         Statement s= null;
         try {
             s = conn.createStatement();
@@ -3209,69 +3197,65 @@ public class DbMetadataSource implements IMetadataSource {
         }
     }
     
-    /**
-     * insert coverage id and origin into gridded domain set
-     * @param coverage_id
-     * @param origin_x
-     * @param origin_y 
-     */
-    public void insertIntoGriddedDomainSet(int coverage_id, double origin_x, double origin_y) {
-        Statement s= null;
+    public void insertIntoGriddedDomainSet(int coverage_id, int origin_x, int origin_y, boolean commit) throws PetascopeException {
+        Statement s = null;
         try {
             s = conn.createStatement();
-            //for more than two native crs, run this in a loop.            
             String sqlQuery =
+                     sqlQuery =
                     "INSERT INTO " + TABLE_GRIDDED_DOMAINSET + " (" + GRIDDED_DOMAINSET_COVERAGE_ID + "," + GRIDDED_DOMAINSET_ORIGIN + ") " +
                     "VALUES " + "(" + coverage_id + "," + "'" + "{" + origin_x + "," + origin_y + "}" + "'" + ")"
                     ;
-            log.debug("SQLQuery : " + sqlQuery);
+            log.debug("SQL query : " + sqlQuery);
             setQuery(sqlQuery);
-            ResultSet r = s.executeQuery(query);
-        } catch (SQLException ex) {
-            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
-            try {
-                if (s != null) {
-                    s.close();
-                }
-                abortAndClose();
-            } catch (SQLException f) {
-                log.warn(f.getMessage());
+            int count = s.executeUpdate(query);
+            log.trace("general coverage info for: " + count);
+            s.close();
+
+            if (commit) {
+                commitAndClose();
             }
-        }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                s.close();
+            } catch (Exception e) {
+            }
+       }
     }
+   
     
     //**********************************************************************
     //**************** grid axes *******************************************
     //**********************************************************************
     
-    /**
-     * grid axes
-     * @param gridded_coverage_id
-     * @param rasdaman_order 
-     */
-    public void insertIntoGridAxis(int gridded_coverage_id, int rasdaman_order) {
-        Statement s= null;
+    
+    public void insertIntoGridAxis(int gridded_coverage_id, int rasdaman_order, boolean commit) throws PetascopeException {
+        Statement s = null;
         try {
             s = conn.createStatement();
-            //for more than two native crs, run this in a loop.            
             String sqlQuery =
                     "INSERT INTO " + TABLE_GRID_AXIS + " (" + GRID_AXIS_COVERAGE_ID + "," + GRID_AXIS_RASDAMAN_ORDER + ") " +
-                    "VALUES " + "(" + gridded_coverage_id + "," + rasdaman_order + "}" + "'" + ")"
+                    "VALUES " + "(" + gridded_coverage_id + "," + rasdaman_order +  ")"
                     ;
-            log.debug("SQLQuery : " + sqlQuery);
+            log.debug("SQL query : " + sqlQuery);
             setQuery(sqlQuery);
-            ResultSet r = s.executeQuery(query);
-        } catch (SQLException ex) {
-            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
-            try {
-                if (s != null) {
-                    s.close();
-                }
-                abortAndClose();
-            } catch (SQLException f) {
-                log.warn(f.getMessage());
+            int count = s.executeUpdate(query);
+            log.trace("general coverage info for: " + count);
+            s.close();
+
+            if (commit) {
+                commitAndClose();
             }
-        }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                s.close();
+            } catch (Exception e) {
+            }
+       }
     }
     
     //*************************************************************************************************
@@ -3327,41 +3311,39 @@ public class DbMetadataSource implements IMetadataSource {
      * @param offset
      * @param rasdaman_order 
      */
-    public void insertIntoRectilinearAxis(int grid_axis_id, double offset, int rasdaman_order) {
-        Statement s= null;
+    public void insertIntoRectilinearAxis(int grid_axis_id, int offset, int rasdaman_order, boolean commit) throws PetascopeException {
+        Statement s = null;
         try {
             String sqlQuery = "";
             s = conn.createStatement();
             if (rasdaman_order == 0) {
                 sqlQuery =
                     "INSERT INTO " + TABLE_RECTILINEAR_AXIS + " (" + RECTILINEAR_AXIS_ID + "," + RECTILINEAR_AXIS_OFFSET_VECTOR + ") " +
-                    "VALUES " + "(" + grid_axis_id + "," + "{" + offset + "," + "0" + "," + "0"+ "}" + "'" + ")"
+                    "VALUES " + "(" + grid_axis_id + "," + "{" + offset + "," + "0"+ "}" + "'" + ")"
                     ;
             } else if (rasdaman_order == 1) {
                 sqlQuery =
                     "INSERT INTO " + TABLE_RECTILINEAR_AXIS + " (" + RECTILINEAR_AXIS_ID + "," + RECTILINEAR_AXIS_OFFSET_VECTOR + ") " +
-                    "VALUES " + "(" + grid_axis_id + "," + "{" + "0" + "," + offset + "," + "0"+ "}" + "'" + ")"
-                    ;
-            } else if (rasdaman_order == 2) {
-                sqlQuery =
-                    "INSERT INTO " + TABLE_RECTILINEAR_AXIS + " (" + RECTILINEAR_AXIS_ID + "," + RECTILINEAR_AXIS_OFFSET_VECTOR + ") " +
-                    "VALUES " + "(" + grid_axis_id + "," + "{" + "0" + "," + "0" + "," + offset + "}" + "'" + ")"
+                    "VALUES " + "(" + grid_axis_id + "," + "{" + "0" + "," + offset + "}" + "'" + ")"
                     ;
             }
-            log.debug("SQLQuery : " + sqlQuery);
+            log.debug("SQL query : " + sqlQuery);
             setQuery(sqlQuery);
-            ResultSet r = s.executeQuery(query);
-        } catch (SQLException ex) {
-            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
-            try {
-                if (s != null) {
-                    s.close();
-                }
-                abortAndClose();
-            } catch (SQLException f) {
-                log.warn(f.getMessage());
+            int count = s.executeUpdate(query);
+            log.trace("general coverage info for: " + count);
+            s.close();
+
+            if (commit) {
+                commitAndClose();
             }
-        }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                s.close();
+            } catch (Exception e) {
+            }
+       }
     }
     
     //**************************************************************
@@ -3415,27 +3397,30 @@ public class DbMetadataSource implements IMetadataSource {
      * @param metadata_type_id          extra metadata type id
      * @param value                     extra metadata value eg. <test><ows/test>
      */
-    public void insertIntoExtraMetadata(int extraMetadata_id, int metadata_type_id, String value) {
-        Statement s= null;
+     public void insertIntoExtraMetadata(int extraMetadata_id, int metadata_type_id, String value, boolean commit) throws PetascopeException {
+        Statement s = null;
         try {
             s = conn.createStatement();
             String sqlQuery =
                     "INSERT INTO " + TABLE_EXTRAMETADATA + " (" + EXTRAMETADATA_COVERAGE_ID + "," + EXTRAMETADATA_VALUE + ") " +
                     "VALUES " + "(" + extraMetadata_id + "," + metadata_type_id + "," + "'" + value + "'" + ")"
                     ;
-            log.debug("SQLQuery : " + sqlQuery);
+            log.debug("SQL query : " + sqlQuery);
             setQuery(sqlQuery);
-            ResultSet r = s.executeQuery(query);
-        } catch (SQLException ex) {
-            java.util.logging.Logger.getLogger(DbMetadataSource.class.getName()).log(Level.SEVERE, null, ex);
-            try {
-                if (s != null) {
-                    s.close();
-                }
-                abortAndClose();
-            } catch (SQLException f) {
-                log.warn(f.getMessage());
+            int count = s.executeUpdate(query);
+            log.trace("general coverage info for: " + count);
+            s.close();
+
+            if (commit) {
+                commitAndClose();
             }
-        }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                s.close();
+            } catch (Exception e) {
+            }
+       }
     }
 }

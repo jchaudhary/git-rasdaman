@@ -38,7 +38,7 @@ public class InsertCoverageRequest extends BaseRequest {
     public static final String NEW = "new";
         
     private final String coverageRef;
-    private String useId;
+    private final String useId;
     
     //to-do
     //AbstractCoverage coverage;
@@ -49,11 +49,15 @@ public class InsertCoverageRequest extends BaseRequest {
     
     public InsertCoverageRequest(String url, String useId) {
         this.coverageRef = url;
-        this.useId = (useId == NEW) ? NEW : EXISTING;
+        this.useId = useId;
     }
     
     public String getCoverageRef() {
         return this.coverageRef;
+    }
+    
+    public String getUseId() {
+        return this.useId;
     }
     
       @Override

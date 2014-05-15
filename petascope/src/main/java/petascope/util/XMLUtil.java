@@ -1277,6 +1277,21 @@ public class XMLUtil {
         return value;
     }
     
+    private static List<String> valueList = new ArrayList<String>();
+    
+    public static List<String> returnValueList(Element current, String elementName) {
+        Elements children = current.getChildElements();
+        for (int i = 0; i < children.size(); i++) {
+            if (children.get(i).getLocalName().equalsIgnoreCase(elementName)) {
+                valueList.add(children.get(i).getValue());
+            } else {
+                returnValueList(children.get(i), elementName);
+            }
+        }
+        return valueList;
+    }
+    
+    
     private static BufferedReader rd;
     public static BufferedReader returnStream(Element current, String elementName) {
         Elements children = current.getChildElements();

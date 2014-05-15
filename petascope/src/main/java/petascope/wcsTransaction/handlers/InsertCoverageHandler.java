@@ -39,6 +39,7 @@ import java.util.logging.Level;
 import nu.xom.Builder;
 import nu.xom.Document;
 import nu.xom.Element;
+import nu.xom.Elements;
 import nu.xom.ParsingException;
 import petascope.wcsTransaction.parsers.InsertCoverageRequest;
 import petascope.wcs2.handlers.Response;
@@ -68,6 +69,7 @@ import static petascope.util.XMLUtil.returnAttributeValue;
 import static petascope.util.XMLUtil.returnNamespaceUrl;
 import static petascope.util.XMLUtil.returnStream;
 import static petascope.util.XMLUtil.returnValue;
+import static petascope.util.XMLUtil.returnValueList;
 import petascope.wcps.server.core.CellDomainElement;
 import petascope.wcps.server.core.DomainElement;
 import petascope.wcs2.handlers.AbstractRequestHandler;
@@ -91,7 +93,7 @@ public class InsertCoverageHandler extends AbstractRequestHandler<InsertCoverage
         Document ret = constructDocument(LABEL_COVERAGE_DESCRIPTIONS, NAMESPACE_WCS);
         Element root = null;
         //String url = request.getCoverageRef();
-        String url = "http://localhost:8080/rasdaman/?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=mean_summer_airtemp";
+        String url = "http://localhost:8080/rasdaman/?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=mr";
         Document coverage = null;
         Builder parser = new Builder();
         Set<Pair<String, String>> namespaceSet = new HashSet<Pair<String, String>>();
@@ -105,23 +107,107 @@ public class InsertCoverageHandler extends AbstractRequestHandler<InsertCoverage
         } catch (IOException ex) {
             java.util.logging.Logger.getLogger(InsertCoverageHandler.class.getName()).log(Level.SEVERE, null, ex);
         }
-         
-        //Preparing to insert into rasdaman
+        
         List<Pair<Integer,Integer>> sdom = new ArrayList();
         Element domainSet = root.getFirstChildElement("domainSet", returnNamespaceUrl("gml", namespaceSet));
-        String highTemp = returnValue(domainSet, "high");
-        String lowTemp = returnValue(domainSet, "low");
-        String dimension = returnAttributeValue(domainSet, "dimension");
-        log.trace("dimension = " + Integer.valueOf(dimension));
-        String sdomString = sdomToStringBuilder(Integer.valueOf(dimension), highTemp, lowTemp);
-        log.trace(("Strng format " + sdomString));
         Element rangeSet = root.getFirstChildElement("rangeSet", returnNamespaceUrl("gml", namespaceSet));
+        Element rangeType = root.getFirstChildElement("rangeType", returnNamespaceUrl("gml", namespaceSet));
+
+        String gmlNamespace = returnNamespaceUrl("gml", namespaceSet);
+        String coverageType = root.getLocalName();
         
-        System.out.println(meta.getCoverageId("rgb"));
+        String useId = request.getUseId();
+        int xa = useId.length();
+        useId = useId.substring(1, xa-1);
+        System.out.println(useId);
+        String coverageName = "mr_1";
+      /*  if (useId.compareToIgnoreCase("existing") == 0) {
+            coverageName = root.getAttributeValue("id", gmlNamespace);
+            if (meta.existsCoverageName(coverageName)) {
+                coverageName += "_v2";
+            }
+        } else if (useId.compareToIgnoreCase("new") == 0) {
+            coverageName = root.getAttributeValue("id", gmlNamespace) + "_1";
+        }*/
         
-        String collName = "testhour";
-        String collType = "GreySet";
-        String baseType = "char";
+        //************************** Insert into rasdaman ****************************
+        /*
+        String collType = "GreySet"; //for mr
+        meta.createCollection(coverageName, collType);
+        
+        String baseType = "char"; //for mr
+        meta.initializeCollection(coverageName, domainSet, baseType);
+        try {
+            meta.insertCollection(coverageName, domainSet, rangeSet, baseType);
+        } catch (IOException ex) {
+            java.util.logging.Logger.getLogger(InsertCoverageHandler.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        */
+        
+        //*********************************** insert into petascope *********************************
+        int gmlSubtypeId = meta.getGmlSubtypeId(coverageType);
+        String mimeType = "application/x-octet-stream";
+        int nativeFormatId = meta.getMimeTypeId(mimeType);
+        
+        //meta.insertGeneralCoverageInfo(coverageName, gmlSubtypeId, nativeFormatId, true);
+        
+        int coverageId = meta.getCoverageId(coverageName);
+        BigInteger collectionOid = meta.getCollOid(coverageName);
+        int storageId = meta.getRasCollId(coverageName);
+        //meta.insertIntoRasCollection(coverageName, collectionOid.intValue(), true);
+        //meta.insertIntoRangeSet(coverageId, storageId, true);
+        
+        String rangeDataType = "unsigned char";
+        int rangeDataTypeId = meta.getRangeDataTypeId(rangeDataType);
+        
+        int quantityId = meta.getQuantityId(rangeDataType);
+        
+        String rangeTypeComponentName = "value";
+        
+        //meta.insertIntoRangeTypeComponent(coverageId, rangeTypeComponentName, 0,rangeDataTypeId , quantityId, true);
+        
+        //String crsUri = 
+        //meta.insertIntoCrsUri(crsUri, true);
+        
+        List<Integer> crsIds = new ArrayList<Integer>();
+        crsIds.add(3);
+        //meta.insertIntoDomainSet(coverageId, crsIds, true);
+        String originString = returnValue(domainSet, "origin");
+        String origin = originString;
+        System.out.print(origin);
+        String x = origin.split(" ")[0];
+        System.out.println("x" + x);
+        String y = originString.split(" ")[1];
+        System.out.println("y" + y);
+        int gridOriginX = Integer.parseInt(x);
+        int gridOriginY = Integer.parseInt(y);
+        meta.insertIntoGriddedDomainSet(coverageId, gridOriginX, gridOriginY, true);
+        
+        meta.insertIntoGridAxis(coverageId, 0, true);
+        meta.insertIntoGridAxis(coverageId, 1, true);
+
+        List<String> offset = returnValueList(domainSet, "offsetVector");
+        System.out.println(offset);
+        
+        int gridAxisId0 = meta.getGridAxisId(coverageId, 0);
+        int gridAxisId1 = meta.getGridAxisId(coverageId, 1);
+        
+        meta.insertIntoRectilinearAxis(gridAxisId0, 1, 0, true);
+        meta.insertIntoRectilinearAxis(gridAxisId1, 0, -1, true);
+        
+        String ows = "ows";
+        String gmlcov =  "gmlcov";
+        int metadataTypeId = 0;
+        metadataTypeId = meta.getExtraMetadataTypeId(ows);
+        String valueOws = "<test>ows</test>";
+        String valueGmlCov = "<test>gmlcov</test>";
+        meta.insertIntoExtraMetadata(coverageId, metadataTypeId, valueOws, true);
+        metadataTypeId = meta.getExtraMetadataTypeId(gmlcov);
+        meta.insertIntoExtraMetadata(coverageId, metadataTypeId, valueGmlCov, true);
+        
+        //String collName = "testhour";
+        //String collType = "GreySet";
+        //String baseType = "char";
         //meta.createCollection(collName, collType);
         //meta.initializeCollection(collName,domainSet,baseType);
         /*
@@ -132,11 +218,6 @@ public class InsertCoverageHandler extends AbstractRequestHandler<InsertCoverage
         }
         */
         //Element rangeSet = root.getFirstChildElement("rangeSet", returnNamespaceUrl("gml", namespaceSet));
-        String cs = returnAttributeValue(rangeSet, "tupleList", "cs");
-        log.trace(cs);
-        String ts = returnAttributeValue(rangeSet, "tupleList", "ts");
-        log.trace(ts);
-      
         
         /*
         meta.createCollection("laddu", "GreySet");
@@ -148,18 +229,7 @@ public class InsertCoverageHandler extends AbstractRequestHandler<InsertCoverage
         meta.initialize2DCollection(coordinate, "laddu", "char");
         meta.insert2DCoverage("laddu", coordinate, returnValue(rangeSet, "tupleList"), baseType);
         */
-        
-        
-        
-        
-        System.out.println("inserting into rasdaman portion"); 
-        String testdata = "1,2,3,4,5,2,3,6,5,4,3,5,6,8,9";
-        
-       
-        
-       
-        
-        
+               
         /*
         String gmlNamespace = returnNamespaceUrl("gml", namespaceSet);
         String coverageName = root.getAttributeValue("id", gmlNamespace);
